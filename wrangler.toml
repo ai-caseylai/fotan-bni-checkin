@@ -1,0 +1,12 @@
+name = "fotan"
+compatibility_date = "2025-06-01"
+pages_build_output_dir = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fotan-db"
+database_id = "96baaebb-c825-4dcc-8229-e55abab0d474"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "fotan-bucket"

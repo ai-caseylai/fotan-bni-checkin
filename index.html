@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d9488">
+<title>火炭會聚會</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f0fdfa;color:#1e293b;-webkit-tap-highlight-color:transparent}
+#app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:#fff}
+#top{background:#0d9488;color:#fff;text-align:center;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0));flex-shrink:0}
+#top h1{font-size:17px;font-weight:800}
+#top .sub{font-size:11px;opacity:.8;margin-top:1px}
+#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#bar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;padding-bottom:calc(8px + env(safe-area-inset-bottom,0));background:#0d9488;color:#fff;flex-shrink:0;gap:8px;font-size:12px}
+#bar span{flex:1}
+#bar button{padding:6px 14px;border-radius:6px;border:1.5px solid rgba(255,255,255,.5);background:rgba(255,255,255,.15);color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;background:#f0fdfa;z-index:5}
+.hdr .cnt{background:#0d9488;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px}
+
+.row{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid #f1f5f9;gap:10px;cursor:pointer;transition:background .1s}
+.row:active{background:#f0fdfa}
+.av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;color:#fff}
+.av.member{background:#10b981}.av.guest{background:#f59e0b}.av.observer{background:#6366f1}
+.info{flex:1;min-width:0}
+.info .n{font-weight:600;font-size:15px}
+.info .m{font-size:11px;color:#94a3b8;margin-top:1px}
+.badge{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
+.badge .t{font-size:12px;font-weight:700;color:#0d9488}
+.badge .p{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px}
+.p1{background:#d1fae5;color:#065f46}.p0{background:#fee2e2;color:#991b1b}
+
+.loading{text-align:center;padding:60px 20px;color:#94a3b8}
+.nomeet{text-align:center;padding:60px 20px;color:#94a3b8}
+
+.result{text-align:center;padding:30px 16px 120px;background:#fff}
+.result .icon{font-size:56px;margin-bottom:8px}
+.result .rname{font-size:22px;font-weight:700;margin-bottom:2px}
+.result .rtime{font-size:15px;color:#0d9488;font-weight:600;margin-bottom:16px}
+.result .tag{display:inline-block;padding:8px 20px;border-radius:10px;font-size:16px;font-weight:700;margin-bottom:20px}
+.tag-p{background:#d1fae5;color:#065f46}.tag-u{background:#fee2e2;color:#991b1b}
+
+.card{background:#f8fafc;border-radius:14px;padding:18px;margin:12px 0;text-align:left}
+.card h3{font-size:14px;font-weight:700;margin-bottom:8px}
+.card .big{font-size:36px;font-weight:800;color:#0d9488;margin-bottom:4px}
+.card .sched{font-size:12px;color:#475569;line-height:1.8;white-space:pre-line;margin-top:8px}
+.msg{background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px;margin-top:12px;text-align:center;font-size:14px;color:#1e40af;line-height:1.8;white-space:pre-line;font-weight:600}
+
+.btn-pay{display:flex;align-items:center;justify-content:center;gap:8px;margin:6px 0;padding:14px;border-radius:12px;color:#fff;text-decoration:none;font-size:16px;font-weight:700;letter-spacing:.3px}
+.btn-pay:active{opacity:.85}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.dbox{background:#fff;border-radius:18px;padding:24px 20px;width:100%;max-width:300px;text-align:center}
+.dbox .dn{font-size:20px;font-weight:700;margin-bottom:4px}
+.dbox .dm{font-size:12px;color:#94a3b8;margin-bottom:14px}
+.dbox .db{display:flex;gap:8px}
+.dbox .db button{flex:1;padding:12px;border-radius:10px;font-size:15px;font-weight:700;border:none;cursor:pointer}
+.btn-no{background:#f1f5f9;color:#64748b}.btn-yes{background:#0d9488;color:#fff}
+.dimmed{opacity:.2;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="top"><h1>火炭會聚會 <span style="font-size:10px;opacity:.5">v2.0</span></h1><div id="sub"></div></div>
+<div id="main"></div>
+<div id="bar"><span id="bar-msg"></span><button onclick="location.reload()">🔄</button></div>
+</div>
+<script>
+var API='/api';
+var meeting=null,members=[],guests=[],observers=[],checked=[],locked=false,last=null;
+
+var D={
+  lunchFee:'388',paymeLink:'https://payme.hsbc/fotan',
+  wcLink:'https://pay.weixin.qq.com/',aliLink:'https://www.alipayhk.com/',
+  tableNumber:'8',
+  schedule:'12:30 報到及交流\n12:45 例會正式開始\n13:00 會員介紹 (30秒每位)\n13:20 專題分享\n13:40 來賓介紹\n14:00 商業引薦\n14:30 午宴及自由交流\n15:00 活動結束',
+  chairmanMsg:'感謝您今天蒞臨火炭會聚會！\n期待每個月也可以見面！'
+};
+
+function E(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+function A(p,o){return fetch(API+p,Object.assign({},o||{},{headers:(o&&o.body)?{'Content-Type':'application/json'}:{}})).then(function(r){return r.json()})}
+
+function init(){
+  document.getElementById('sub').textContent='載入中...';
+  var main=document.getElementById('main');
+  A('/meetings').then(function(ms){
+    var today=new Date().toISOString().split('T')[0];
+    meeting=ms.find(function(m){return m.date===today});
+    if(!meeting){
+      document.getElementById('sub').textContent='簽到';
+      main.innerHTML='<div class="nomeet"><h3>今日未有會議</h3><p style="margin-top:4px;font-size:13px">請到後台建立</p></div>';
+      document.getElementById('bar-msg').textContent='無會議';
+      return;
+    }
+    document.getElementById('sub').textContent='📅 '+meeting.date+' '+(meeting.type==='regular'?'例會':'特別會議');
+    return Promise.all([A('/members'),A('/guests'),A('/observers'),A('/attendance?meeting_id='+meeting.id)]);
+  }).then(function(r){
+    if(!r)return;
+    members=r[0];guests=r[1];observers=r[2];checked=r[3];locked=false;
+    render();
+  });
+}
+
+function allPeople(){
+  var map={};checked.forEach(function(a){map[a.person_type+'_'+a.person_id]=a});
+  var all=[];
+  members.forEach(function(p){all.push({p:p,type:'member',label:'會員',att:map['member_'+p.id]||null})});
+  guests.forEach(function(p){all.push({p:p,type:'guest',label:'來賓',att:map['guest_'+p.id]||null})});
+  observers.forEach(function(p){all.push({p:p,type:'observer',label:'觀察員',att:map['observer_'+p.id]||null})});
+  return all;
+}
+
+function render(){
+  var main=document.getElementById('main');
+  if(locked&&last){
+    var paid=last.payment&&last.payment!=='unpaid'&&last.payment!=='';
+    var fee=E(D.lunchFee),sched=E(D.schedule),chair=E(D.chairmanMsg);
+    var h='<div class="result">';
+    h+='<div class="icon">✅</div>';
+    h+='<div class="rname">'+E(last.name)+'</div>';
+    h+='<div class="rtime">'+E(last.time)+'</div>';
+    if(paid){
+      h+='<div class="tag tag-p">已繳費 / 已缴费 / Paid</div>';
+      h+='<div class="card"><h3>🍽 '+E(D.tableNumber)+' 號枱 · 午宴資訊</h3>';
+      if(D.schedule)h+='<div class="sched">'+sched+'</div>';
+      h+='</div>';
+    }else{
+      h+='<div class="tag tag-u">還未繳費 / 还未缴费 / Unpaid</div>';
+      h+='<div class="card">';
+      h+='<h3>🍽 午餐費用</h3><div class="big">HK$'+fee+'</div>';
+      h+='<p style="font-size:12px;color:#94a3b8;margin-bottom:10px">點擊以下按鈕直接付款</p>';
+      if(D.paymeLink)h+='<a href="'+E(D.paymeLink)+'" target="_blank" class="btn-pay" style="background:#e31b5f">💳 PayMe · HK$'+fee+'</a>';
+      if(D.wcLink)h+='<a href="'+E(D.wcLink)+'" target="_blank" class="btn-pay" style="background:#00b533">💚 WeChat Pay · HK$'+fee+'</a>';
+      if(D.aliLink)h+='<a href="'+E(D.aliLink)+'" target="_blank" class="btn-pay" style="background:#1677ff">💙 Alipay HK · HK$'+fee+'</a>';
+      h+='<div style="margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0">';
+      h+='<button onclick="markPaid('+last.attId+')" style="width:100%;padding:12px;border-radius:10px;background:#10b981;color:#fff;border:none;font-size:15px;font-weight:700;cursor:pointer">✅ 我已付款</button>';
+      h+='<p style="margin-top:10px;font-size:11px;color:#94a3b8;line-height:1.6">📱 請把付款截圖 WhatsApp 至 <a href="https://wa.me/85297188675" style="color:#25d366;font-weight:700">97188675</a><br>或展示給前台大使。謝謝！<br><span style="font-size:10px">祝你有愉快的一天 ✨</span></p>';
+      h+='</div>';
+      h+='</div>';
+    }
+    if(D.schedule)h+='<div class="card"><h3>📋 今日節目表</h3><div class="sched">'+sched+'</div></div>';
+    if(D.chairmanMsg)h+='<div class="msg">💬 '+chair+'</div>';
+    h+='</div>';
+    main.innerHTML=h;
+    document.getElementById('bar-msg').textContent='已簽到 ✓';
+    return;
+  }
+
+  var all=allPeople(),cnt=all.filter(function(x){return!!x.att}).length,total=all.length;
+  document.getElementById('bar-msg').textContent='火炭會聚會 — 簽到';
+  main.innerHTML='<div class="hdr"><span>全部名單</span><span class="cnt">'+cnt+' / '+total+'</span></div>'+
+    all.map(function(x){return renderRow(x);}).join('');
+
+  main.querySelectorAll('.row').forEach(function(row){
+    row.addEventListener('click',function(){
+      if(locked)return;
+      showConfirm(row.dataset.type,parseInt(row.dataset.id),row.dataset.name,row.dataset.label);
+    });
+  });
+}
+
+function renderRow(x){
+  var has=!!x.att,paid=has&&x.att.payment&&x.att.payment!=='unpaid'&&x.att.payment!=='';
+  var meta=x.p.professional||x.p.chapter||x.label;
+  var right=has?'<div class="badge"><span class="t">'+(x.att.arrival_time||'')+'</span><span class="p '+(paid?'p1':'p0')+'">'+(paid?'已繳費':'未繳費')+'</span></div>':'';
+  return '<div class="row" data-type="'+x.type+'" data-id="'+x.p.id+'" data-name="'+E(x.p.name)+'" data-label="'+x.label+'"><div class="av '+x.type+'">'+E(x.p.name.charAt(0))+'</div><div class="info"><div class="n">'+E(x.p.name)+'</div><div class="m">'+E(meta)+'</div></div>'+right+'</div>';
+}
+
+function showConfirm(type,id,name,label){
+  document.getElementById('main').classList.add('dimmed');
+  document.getElementById('top').classList.add('dimmed');
+  var ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML='<div class="dbox"><div class="dn">'+E(name)+'</div><div class="dm">'+E(label)+'</div><p style="margin-bottom:14px;color:#64748b">確認簽到？</p><div class="db"><button class="btn-no" id="bn">取消</button><button class="btn-yes" id="by">✓ 確認</button></div></div>';
+  document.body.appendChild(ov);
+  var clean=function(){document.body.removeChild(ov);document.getElementById('main').classList.remove('dimmed');document.getElementById('top').classList.remove('dimmed')};
+  document.getElementById('bn').onclick=clean;
+  document.getElementById('by').onclick=function(){
+    document.getElementById('by').disabled=true;
+    document.getElementById('bn').disabled=true;
+    doCheckin(type,id,name).then(function(r){locked=true;last=r;clean();render()}).catch(function(){locked=true;clean();render()});
+  };
+  ov.addEventListener('click',function(e){if(e.target===ov)clean()});
+}
+
+function doCheckin(type,id,name){
+  var exist=checked.find(function(a){return a.person_type===type&&a.person_id===id});
+  if(exist)return Promise.resolve(null);
+  var now=new Date(),time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  var pay=(type==='guest')?'':'paid';
+  var row=document.querySelector('.row[data-type="'+type+'"][data-id="'+id+'"]');
+  if(row){var pd=pay&&pay!=='unpaid'&&pay!=='';row.querySelector('.info').insertAdjacentHTML('afterend','<div class="badge"><span class="t">'+time+'</span><span class="p '+(pd?'p1':'p0')+'">'+(pd?'已繳費':'未繳費')+'</span></div>')}
+  return A('/attendance',{method:'POST',body:JSON.stringify({meeting_id:meeting.id,person_type:type,person_id:id,arrival_time:time,payment:pay})}).then(function(r){return{name:name,time:time,payment:pay,attId:r.id}});
+}
+
+function markPaid(attId){
+  A('/attendance',{method:'PUT',body:JSON.stringify({id:attId,payment:'paid'})}).then(function(){
+    document.getElementById('main').innerHTML='<div class="result"><div class="icon">🎉</div><div class="rname">付款已確認！</div><div class="rtime">Payment Confirmed!</div><button onclick="location.reload()" style="margin-top:20px;padding:12px 32px;border-radius:10px;background:#0d9488;color:#fff;border:none;font-size:16px;font-weight:700;cursor:pointer">🔄 重新整理</button></div>';
+    document.getElementById('bar-msg').textContent='已付款 ✓';
+  });
+}
+
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
