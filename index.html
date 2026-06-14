@@ -5,61 +5,82 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0d9488">
-<title>火炭會聚會</title>
+<title>火炭會聚會 v3</title>
 <style>
+:root{
+  --pri:#0d9488;--pri-hover:#0f766e;--pri-light:#f0fdfa;
+  --bg:#f8fafc;--surface:#fff;--border:#e2e8f0;
+  --text:#0f172a;--text2:#64748b;--text3:#94a3b8;
+  --danger:#ef4444;--success:#10b981;--warn:#f59e0b;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+  --radius:12px;--radius-sm:8px;
+}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f0fdfa;color:#1e293b;-webkit-tap-highlight-color:transparent}
-#app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:#fff}
-#top{background:#0d9488;color:#fff;text-align:center;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0));flex-shrink:0}
-#top h1{font-size:17px;font-weight:800}
-#top .sub{font-size:11px;opacity:.8;margin-top:1px}
-#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
-#bar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;padding-bottom:calc(8px + env(safe-area-inset-bottom,0));background:#0d9488;color:#fff;flex-shrink:0;gap:8px;font-size:12px}
-#bar span{flex:1}
-#bar button{padding:6px 14px;border-radius:6px;border:1.5px solid rgba(255,255,255,.5);background:rgba(255,255,255,.15);color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#e2e8f0;color:var(--text);-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+#app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:var(--bg)}
+#top{background:var(--pri);color:#fff;text-align:center;padding:14px 20px;padding-top:calc(14px + env(safe-area-inset-top,0));flex-shrink:0}
+#top h1{font-size:17px;font-weight:700;letter-spacing:-.2px}
+#top .sub{font-size:11px;opacity:.85;margin-top:2px;font-weight:500}
+#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0}
+#bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0));background:var(--pri);color:#fff;flex-shrink:0;gap:8px;font-size:12px}
+#bar span{flex:1;font-weight:500}
+#bar button{padding:6px 14px;border-radius:20px;border:1.5px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s}
+#bar button:active{background:rgba(255,255,255,.25)}
 
-.hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;background:#f0fdfa;z-index:5}
-.hdr .cnt{background:#0d9488;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--border)}
+.hdr .cnt{background:var(--pri);color:#fff;font-size:10px;padding:2px 10px;border-radius:10px;font-weight:600}
 
-.row{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid #f1f5f9;gap:10px;cursor:pointer;transition:background .1s}
-.row:active{background:#f0fdfa}
-.av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;color:#fff}
-.av.member{background:#10b981}.av.guest{background:#f59e0b}.av.observer{background:#6366f1}
+.row{display:flex;align-items:center;padding:14px 16px;gap:12px;cursor:pointer;transition:background .15s;background:var(--surface);border-bottom:1px solid var(--border)}
+.row:active{background:var(--pri-light)}
+.av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;color:#fff}
+.av.member{background:var(--success)}.av.guest{background:var(--warn)}
 .info{flex:1;min-width:0}
-.info .n{font-weight:600;font-size:15px}
-.info .m{font-size:11px;color:#94a3b8;margin-top:1px}
-.badge{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
-.badge .t{font-size:12px;font-weight:700;color:#0d9488}
-.badge .p{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px}
-.p1{background:#d1fae5;color:#065f46}.p0{background:#fee2e2;color:#991b1b}
+.info .n{font-weight:600;font-size:15px;color:var(--text)}
+.info .m{font-size:12px;color:var(--text2);margin-top:1px}
 
-.loading{text-align:center;padding:60px 20px;color:#94a3b8}
-.nomeet{text-align:center;padding:60px 20px;color:#94a3b8}
+.loading{text-align:center;padding:80px 20px;color:var(--text3)}
+.nomeet{text-align:center;padding:80px 20px;color:var(--text3)}
+.nomeet h3{font-size:18px;color:var(--text2);margin-bottom:6px}
 
-.result{text-align:center;padding:30px 16px 120px;background:#fff}
-.result .icon{font-size:56px;margin-bottom:8px}
-.result .rname{font-size:22px;font-weight:700;margin-bottom:2px}
-.result .rtime{font-size:15px;color:#0d9488;font-weight:600;margin-bottom:16px}
-.result .tag{display:inline-block;padding:8px 20px;border-radius:10px;font-size:16px;font-weight:700;margin-bottom:20px}
-.tag-p{background:#d1fae5;color:#065f46}.tag-u{background:#fee2e2;color:#991b1b}
+.result{padding:32px 20px 100px;background:var(--surface);text-align:center;min-height:100%}
+.result .rname{font-size:20px;font-weight:700;margin-bottom:4px;color:var(--text)}
+.result .rtime{font-size:14px;color:var(--pri);font-weight:600;margin-bottom:24px}
 
-.card{background:#f8fafc;border-radius:14px;padding:18px;margin:12px 0;text-align:left}
-.card h3{font-size:14px;font-weight:700;margin-bottom:8px}
-.card .big{font-size:36px;font-weight:800;color:#0d9488;margin-bottom:4px}
-.card .sched{font-size:12px;color:#475569;line-height:1.8;white-space:pre-line;margin-top:8px}
-.msg{background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px;margin-top:12px;text-align:center;font-size:14px;color:#1e40af;line-height:1.8;white-space:pre-line;font-weight:600}
+.pay-amount{text-align:center;padding:8px 0 24px}
+.pay-amount .symbol{font-size:13px;color:var(--text2);margin-bottom:4px;font-weight:500}
+.pay-amount .amt{font-size:48px;font-weight:800;color:var(--text);line-height:1;letter-spacing:-1px}
+.pay-amount .note{font-size:13px;color:var(--text3);margin-top:8px}
 
-.btn-pay{display:flex;align-items:center;justify-content:center;gap:8px;margin:6px 0;padding:14px;border-radius:12px;color:#fff;text-decoration:none;font-size:16px;font-weight:700;letter-spacing:.3px}
-.btn-pay:active{opacity:.85}
+.pay-links{display:flex;gap:10px;justify-content:center;margin-bottom:24px}
+.pay-links a{flex:1;max-width:110px;padding:12px 8px;border-radius:var(--radius-sm);color:#fff;text-decoration:none;font-size:12px;font-weight:700;text-align:center;transition:opacity .15s;letter-spacing:-.2px}
+.pay-links a:active{opacity:.85}
 
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
-.dbox{background:#fff;border-radius:18px;padding:24px 20px;width:100%;max-width:300px;text-align:center}
-.dbox .dn{font-size:20px;font-weight:700;margin-bottom:4px}
-.dbox .dm{font-size:12px;color:#94a3b8;margin-bottom:14px}
+.upload-card{background:var(--bg);border:2px dashed #cbd5e1;border-radius:var(--radius);padding:24px 20px;margin-bottom:12px;text-align:center}
+.upload-card .uc-icon{font-size:28px;margin-bottom:8px}
+.upload-card .uc-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px}
+.upload-card input[type=file]{width:100%;font-size:12px;color:var(--text2);margin-bottom:12px}
+.upload-card input[type=file]::file-selector-button{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:#fff;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;margin-right:8px}
+.btn{display:block;width:100%;padding:13px;border-radius:var(--radius-sm);font-size:15px;font-weight:700;border:none;cursor:pointer;transition:all .15s;text-align:center}
+.btn-primary{background:var(--pri);color:#fff}
+.btn-primary:active{background:var(--pri-hover)}
+.btn-ghost{background:var(--surface);color:var(--text2);border:1.5px solid var(--border)}
+.btn-ghost:active{background:var(--bg)}
+
+.card2{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:18px 16px;margin:12px 16px;box-shadow:var(--shadow-sm)}
+.card2 h3{font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.sched{font-size:13px;color:var(--text2);line-height:2;white-space:pre-line}
+.msg2{background:var(--pri-light);border:1px solid #99f6e4;border-radius:var(--radius);padding:14px 16px;margin:8px 16px;text-align:center;font-size:13px;color:var(--pri-hover);line-height:1.7;white-space:pre-line;font-weight:500}
+
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.dbox{background:var(--surface);border-radius:18px;padding:28px 24px;width:100%;max-width:300px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.dbox .dn{font-size:19px;font-weight:700;margin-bottom:4px}
+.dbox .dm{font-size:13px;color:var(--text2);margin-bottom:18px}
 .dbox .db{display:flex;gap:8px}
-.dbox .db button{flex:1;padding:12px;border-radius:10px;font-size:15px;font-weight:700;border:none;cursor:pointer}
-.btn-no{background:#f1f5f9;color:#64748b}.btn-yes{background:#0d9488;color:#fff}
-.dimmed{opacity:.2;pointer-events:none}
+.dbox .db button{flex:1;padding:13px;border-radius:10px;font-size:15px;font-weight:700;border:none;cursor:pointer;transition:all .15s}
+.btn-no{background:var(--bg);color:var(--text2)}.btn-no:active{background:#e2e8f0}
+.btn-yes{background:var(--pri);color:#fff}.btn-yes:active{background:var(--pri-hover)}
+.dimmed{opacity:.3;pointer-events:none}
 </style>
 </head>
 <body>
@@ -74,7 +95,7 @@ var meeting=null,members=[],guests=[],observers=[],checked=[],locked=false,last=
 
 var D={
   lunchFee:'388',paymeLink:'https://payme.hsbc/fotan',
-  wcLink:'https://pay.weixin.qq.com/',aliLink:'https://www.alipayhk.com/',
+  wcLink:'https://pay.weixin.qq.com/',aliLink:'https://www.alipayhk.com/',fpsPhone:'97188675',aliQrImg:'',fpsQrImg:'',
   tableNumber:'8',
   schedule:'12:30 報到及交流\n12:45 例會正式開始\n13:00 會員介紹 (30秒每位)\n13:20 專題分享\n13:40 來賓介紹\n14:00 商業引薦\n14:30 午宴及自由交流\n15:00 活動結束',
   chairmanMsg:'感謝您今天蒞臨火炭會聚會！\n期待每個月也可以見面！'
@@ -87,16 +108,21 @@ function A(p,o){return fetch(API+p,Object.assign({},o||{},{headers:(o&&o.body)?{
 function init(){
   document.getElementById('sub').textContent='載入中...';
   var main=document.getElementById('main');
+  A('/settings').then(function(s){
+    if(s){for(var k in s){if(D.hasOwnProperty(k))D[k]=s[k]}}
+  });
   A('/meetings').then(function(ms){
     var today=new Date().toISOString().split('T')[0];
-    meeting=ms.find(function(m){return m.date===today});
+    var upcoming=ms.filter(function(m){return m.date>=today}).sort(function(a,b){return a.date.localeCompare(b.date)});
+    meeting=upcoming[0];
     if(!meeting){
       document.getElementById('sub').textContent='簽到';
-      main.innerHTML='<div class="nomeet"><h3>今日未有會議</h3><p style="margin-top:4px;font-size:13px">請到後台建立</p></div>';
+      main.innerHTML='<div class="nomeet"><h3>暫無即將舉行的聚會</h3><p style="margin-top:4px;font-size:13px">請到後台建立</p></div>';
       document.getElementById('bar-msg').textContent='無會議';
       return;
     }
-    document.getElementById('sub').textContent='📅 '+meeting.date+' '+(meeting.type==='regular'?'例會':'特別會議');
+    var prefix=meeting.date===today?'📅 ':'📅 [即將舉行] ';
+    document.getElementById('sub').textContent=prefix+meeting.date+' '+(meeting.type==='regular'?'例會':meeting.type==='anniversary'?'週年聚餐':'特別會議');
     return Promise.all([A('/members'),A('/guests'),A('/observers'),A('/attendance?meeting_id='+meeting.id)]);
   }).then(function(r){
     if(!r)return;
@@ -120,39 +146,54 @@ function render(){
     var paid=last.payment&&last.payment!=='unpaid'&&last.payment!=='';
     var fee=E(D.lunchFee),sched=E(D.schedule),chair=E(D.chairmanMsg);
     var h='<div class="result">';
-    h+='<div class="icon">✅</div>';
+    h+='<div class="icon">'+paid?'✅':'📤'+'</div>';
     h+='<div class="rname">'+E(last.name)+'</div>';
     h+='<div class="rtime">'+E(last.time)+'</div>';
     if(paid){
-      h+='<div class="tag tag-p">已繳費 / 已缴费 / Paid</div>';
-      h+='<div class="card"><h3>🍽 '+E(D.tableNumber)+' 號枱 · 午宴資訊</h3>';
-      if(D.schedule)h+='<div class="sched">'+sched+'</div>';
+      h+='<div style="text-align:center;padding:20px 0">';
+      h+='<div style="font-size:48px;margin-bottom:16px">✅</div>';
+      h+='<div style="font-size:14px;font-weight:700;color:var(--success);margin-bottom:4px">簽到確認</div>';
+      h+='<div style="font-size:20px;font-weight:700;margin-bottom:4px">多謝光臨</div>';
+      h+='<div style="font-size:14px;color:var(--text2);margin-bottom:20px">🍽 '+E(D.tableNumber)+' 號枱</div>';
+      if(D.schedule)h+='<div class="card2"><h3>節目表</h3><div class="sched">'+sched+'</div></div>';
+      if(D.chairmanMsg)h+='<div class="msg2">'+chair+'</div>';
       h+='</div>';
     }else{
-      h+='<div class="tag tag-u">還未繳費 / 还未缴费 / Unpaid</div>';
-      h+='<div class="card">';
-      h+='<h3>🍽 午餐費用</h3><div class="big">HK$'+fee+'</div>';
-      h+='<p style="font-size:12px;color:#94a3b8;margin-bottom:10px">點擊以下按鈕直接付款</p>';
-      if(D.paymeLink)h+='<a href="'+E(D.paymeLink)+'" target="_blank" class="btn-pay" style="background:#e31b5f">💳 PayMe · HK$'+fee+'</a>';
-      if(D.wcLink)h+='<a href="'+E(D.wcLink)+'" target="_blank" class="btn-pay" style="background:#00b533">💚 WeChat Pay · HK$'+fee+'</a>';
-      if(D.aliLink)h+='<a href="'+E(D.aliLink)+'" target="_blank" class="btn-pay" style="background:#1677ff">💙 Alipay HK · HK$'+fee+'</a>';
-      h+='<div style="margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0">';
-      h+='<button onclick="markPaid('+last.attId+')" style="width:100%;padding:12px;border-radius:10px;background:#10b981;color:#fff;border:none;font-size:15px;font-weight:700;cursor:pointer">✅ 我已付款</button>';
-      h+='<p style="margin-top:10px;font-size:11px;color:#94a3b8;line-height:1.6">📱 請把付款截圖 WhatsApp 至 <a href="https://wa.me/85297188675" style="color:#25d366;font-weight:700">97188675</a><br>或展示給前台大使。謝謝！<br><span style="font-size:10px">祝你有愉快的一天 ✨</span></p>';
+      h+='<div class="pay-amount">';
+      h+='<div class="symbol">午餐費用</div>';
+      h+='<div class="amt">HK$'+fee+'</div>';
+      h+='<div class="note">請完成付款後上傳憑證</div>';
       h+='</div>';
+
+      if(D.paymeLink||D.wcLink||D.aliLink){
+        h+='<div class="pay-links">';
+        if(D.paymeLink)h+='<a href="'+E(D.paymeLink)+'" target="_blank" style="background:#e31b5f">PayMe</a>';
+if(D.aliLink)h+='<a href="javascript:void(0)" onclick="showAlipayQR('+fee+')" style="background:#1677ff">Alipay</a>';
+        if(D.fpsPhone)h+='<a href="javascript:void(0)" onclick="showFPSQR(\''+E(D.fpsPhone)+'\','+fee+')" style="background:#6366f1">FPS</a>';
+        h+='</div>';
+      }
+
+      h+='<div class="upload-card">';
+      h+='<div class="uc-icon">📤</div>';
+      h+='<div class="uc-title">上傳付款憑證</div>';
+      h+='<input type="file" id="guest-receipt" accept="image/*">';
+      h+='<button onclick="uploadGuestReceipt('+last.attId+')" class="btn btn-primary">確認上傳</button>';
+      h+='<div id="upload-status" style="margin-top:8px;font-size:12px"></div>';
       h+='</div>';
+
+      h+='<button onclick="directCheckin('+last.attId+')" class="btn btn-ghost">跳過，直接簽到</button>';
     }
-    if(D.schedule)h+='<div class="card"><h3>📋 今日節目表</h3><div class="sched">'+sched+'</div></div>';
-    if(D.chairmanMsg)h+='<div class="msg">💬 '+chair+'</div>';
     h+='</div>';
     main.innerHTML=h;
     document.getElementById('bar-msg').textContent='已簽到 ✓';
     return;
   }
 
-  var all=allPeople(),cnt=all.filter(function(x){return!!x.att}).length,total=all.length;
+  var all=allPeople().filter(function(x){return !x.att||(!x.att.arrival_time&&x.att.arrival_time!=='absent');});
+  var done=allPeople().filter(function(x){return !!x.att;});
+  var total=all.length+done.length;
   document.getElementById('bar-msg').textContent='火炭會聚會 — 簽到';
-  main.innerHTML='<div class="hdr"><span>全部名單</span><span class="cnt">'+cnt+' / '+total+'</span></div>'+
+  main.innerHTML='<div class="hdr"><span>尚未簽到</span><span class="cnt">'+all.length+' / '+total+'</span></div>'+
     all.map(function(x){return renderRow(x);}).join('');
 
   main.querySelectorAll('.row').forEach(function(row){
@@ -164,10 +205,8 @@ function render(){
 }
 
 function renderRow(x){
-  var has=!!x.att,paid=has&&x.att.payment&&x.att.payment!=='unpaid'&&x.att.payment!=='';
   var meta=x.p.professional||x.p.chapter||x.label;
-  var right=has?'<div class="badge"><span class="t">'+(x.att.arrival_time||'')+'</span><span class="p '+(paid?'p1':'p0')+'">'+(paid?'已繳費':'未繳費')+'</span></div>':'';
-  return '<div class="row" data-type="'+x.type+'" data-id="'+x.p.id+'" data-name="'+E(x.p.name)+'" data-label="'+x.label+'"><div class="av '+x.type+'">'+E(x.p.name.charAt(0))+'</div><div class="info"><div class="n">'+E(x.p.name)+'</div><div class="m">'+E(meta)+'</div></div>'+right+'</div>';
+  return '<div class="row" data-type="'+x.type+'" data-id="'+x.p.id+'" data-name="'+E(x.p.name)+'" data-label="'+x.label+'"><div class="av '+x.type+'">'+E(x.p.name.charAt(0))+'</div><div class="info"><div class="n">'+E(x.p.name)+'</div><div class="m">'+E(meta)+'</div></div></div>';
 }
 
 function showConfirm(type,id,name,label){
@@ -181,26 +220,76 @@ function showConfirm(type,id,name,label){
   document.getElementById('by').onclick=function(){
     document.getElementById('by').disabled=true;
     document.getElementById('bn').disabled=true;
-    doCheckin(type,id,name).then(function(r){locked=true;last=r;clean();render()}).catch(function(){locked=true;clean();render()});
+    document.getElementById('by').textContent='處理中...';
+    doCheckin(type,id,name).then(function(r){
+      if(!r){clean();return;}
+      locked=true;last=r;clean();render();
+    }).catch(function(e){
+      alert(e&&e.message==='已簽到'?'此人已簽到，請勿重複簽到':'簽到失敗，請重試');
+      clean();
+    });
   };
   ov.addEventListener('click',function(e){if(e.target===ov)clean()});
 }
 
 function doCheckin(type,id,name){
   var exist=checked.find(function(a){return a.person_type===type&&a.person_id===id});
-  if(exist)return Promise.resolve(null);
   var now=new Date(),time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  var pay=(type==='guest')?'':'paid';
+  var pay='';
   var row=document.querySelector('.row[data-type="'+type+'"][data-id="'+id+'"]');
-  if(row){var pd=pay&&pay!=='unpaid'&&pay!=='';row.querySelector('.info').insertAdjacentHTML('afterend','<div class="badge"><span class="t">'+time+'</span><span class="p '+(pd?'p1':'p0')+'">'+(pd?'已繳費':'未繳費')+'</span></div>')}
+  if(row){row.remove();var hdr=document.querySelector('.hdr .cnt');if(hdr){var cur=hdr.textContent.split('/');var n=parseInt(cur[0])+1;hdr.textContent=n+' / '+cur[1];}}
+  if(exist&&exist.arrival_time){
+    // Already signed in with time
+    return Promise.reject(new Error('已簽到'));
+  }
+  if(exist){
+    // Has empty attendance record → update it
+    return A('/attendance',{method:'PUT',body:JSON.stringify({id:exist.id,arrival_time:time,payment:pay})}).then(function(r){return{name:name,time:time,payment:pay,attId:exist.id}});
+  }
+  // New attendance record
   return A('/attendance',{method:'POST',body:JSON.stringify({meeting_id:meeting.id,person_type:type,person_id:id,arrival_time:time,payment:pay})}).then(function(r){return{name:name,time:time,payment:pay,attId:r.id}});
 }
 
-function markPaid(attId){
+function showAlipayQR(fee){
+  var ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML='<div class="dbox" style="max-width:320px"><div class="dn">💙 Alipay HK</div><div class="dm">HK$'+fee+'</div><img src="'+(D.aliQrImg||'/api/image?name=qr-alipay')+'" style="width:200px;height:200px;margin:0 auto 12px;display:block;border-radius:12px;object-fit:contain" onerror="this.src=\'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent('https://www.alipayhk.com/')+'\'"><p style="font-size:11px;color:#94a3b8">長按QR Code儲存到手機</p><button class="btn-yes" style="width:100%;padding:12px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer" onclick="this.parentElement.parentElement.remove()">關閉</button></div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove()});
+  document.body.appendChild(ov);
+}
+function showFPSQR(phone,fee){
+  var ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML='<div class="dbox" style="max-width:320px"><div class="dn">🏦 FPS 轉數快</div><div class="dm">HK$'+fee+' · 收款電話 '+phone+'</div><img src="'+(D.fpsQrImg||'/api/image?name=qr-fps')+'" style="width:200px;height:200px;margin:0 auto 12px;display:block;border-radius:12px;object-fit:contain" onerror="this.src=\'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent('https://fotan.techforliving.net/api/fps-redirect?phone='+phone+'&am='+fee)+'\'"><p style="font-size:11px;color:#94a3b8">長按QR Code儲存到手機</p><button class="btn-yes" style="width:100%;padding:12px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer" onclick="this.parentElement.parentElement.remove()">關閉</button></div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove()});
+  document.body.appendChild(ov);
+}
+function directCheckin(attId){
   A('/attendance',{method:'PUT',body:JSON.stringify({id:attId,payment:'paid'})}).then(function(){
-    document.getElementById('main').innerHTML='<div class="result"><div class="icon">🎉</div><div class="rname">付款已確認！</div><div class="rtime">Payment Confirmed!</div><button onclick="location.reload()" style="margin-top:20px;padding:12px 32px;border-radius:10px;background:#0d9488;color:#fff;border:none;font-size:16px;font-weight:700;cursor:pointer">🔄 重新整理</button></div>';
-    document.getElementById('bar-msg').textContent='已付款 ✓';
+    document.getElementById('main').innerHTML='<div class="result"><div style="font-size:48px;margin-bottom:16px">✅</div><div class="rname">簽到完成</div><div class="rtime">多謝光臨</div><button onclick="location.reload()" class="btn btn-primary" style="margin-top:20px">返回</button></div>';
+    document.getElementById('bar-msg').textContent='已簽到 ✓';
   });
+}
+function uploadGuestReceipt(attId){
+  var file=document.getElementById('guest-receipt').files[0];
+  if(!file){alert('請選擇付款截圖');return;}
+  var status=document.getElementById('upload-status');
+  status.innerHTML='上傳中...';
+  var reader=new FileReader();
+  reader.onload=function(){
+    A('/checkin-upload',{method:'POST',body:JSON.stringify({attendance_id:attId,data:reader.result})}).then(function(r){
+      if(r.ok){
+        status.innerHTML='<span style="color:#10b981">✅ 上傳成功！</span>';
+        setTimeout(function(){
+          document.getElementById('main').innerHTML='<div class="result"><div style="font-size:48px;margin-bottom:16px">🎉</div><div class="rname">感謝</div><div class="rtime">付款憑證已收到</div><button onclick="location.reload()" class="btn btn-primary" style="margin-top:20px">返回</button></div>';
+          document.getElementById('bar-msg').textContent='已上傳 ✓';
+        },1000);
+      }else{
+        status.innerHTML='<span style="color:#ef4444">❌ 上傳失敗，請重試</span>';
+      }
+    }).catch(function(){
+      status.innerHTML='<span style="color:#ef4444">❌ 網絡錯誤，請重試</span>';
+    });
+  };
+  reader.readAsDataURL(file);
 }
 
 document.addEventListener('DOMContentLoaded',init);

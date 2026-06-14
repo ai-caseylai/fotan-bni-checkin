@@ -1,0 +1,2 @@
+ALTER TABLE members ADD COLUMN email TEXT DEFAULT '';
+ALTER TABLE members ADD COLUMN fee_paid_date TEXT DEFAULT '';

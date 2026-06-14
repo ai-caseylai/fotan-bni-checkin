@@ -21,16 +21,16 @@ export async function onRequest(context) {
     }
     if (request.method === 'POST') {
       const body = await request.json();
-      const { name, tel } = body;
+      const { name, tel, email, fee_paid_date, professional, role } = body;
       if (!name) return Response.json({ error: 'Name required' }, { status: 400, headers: cors });
-      const result = await env.DB.prepare('INSERT INTO members (name, tel) VALUES (?,?)').bind(name, tel || '').run();
+      const result = await env.DB.prepare('INSERT INTO members (name, tel, email, fee_paid_date, professional, role) VALUES (?,?,?,?,?,?)').bind(name, tel || '', email || '', fee_paid_date || '', professional || '', role || '會員').run();
       return Response.json({ id: result.meta.last_row_id, name, tel }, { headers: cors });
     }
     if (request.method === 'PUT') {
       if (!id) return Response.json({ error: 'ID required' }, { status: 400, headers: cors });
       const body = await request.json();
       const sets = [], vals = [];
-      for (const k of ['name','tel','active']) {
+      for (const k of ['name','tel','email','fee_paid_date','professional','role','active']) {
         if (body[k] !== undefined) { sets.push(`${k}=?`); vals.push(body[k]); }
       }
       if (!sets.length) return Response.json({ error: 'No fields' }, { status: 400, headers: cors });
