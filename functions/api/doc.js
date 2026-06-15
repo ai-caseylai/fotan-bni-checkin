@@ -33,7 +33,7 @@ export async function onRequest(context) {
         id: 10,
         date: '2026-06-20',
         type: 'anniversary',
-        fees: { committee_fee: 298, member_fee: 398, guest_fee: 398, early_bird_fee: 398, walk_in_fee: 398 },
+        fees: { committee_fee: 220, member_fee: 398, guest_fee: 398, early_bird_fee: 398, walk_in_fee: 398 },
         stats: { total: 118, members: 26, guests: 92, paid: 58, free: 12, unpaid: 48, revenue: 23084 }
       }
     },
@@ -162,6 +162,7 @@ export async function onRequest(context) {
       update_table: '設定枱號 {meeting_id,person_type,person_id,table_number}',
       mark_arrival: '標記簽到 {attendance_id,arrival_time（HH:MM 或 absent）}',
       list_meetings: '列出所有會議',
+      update_meeting: '更新會議 {meeting_id,date,type,guest_fee,member_fee,committee_fee,...}',
       meeting_stats: '會議統計（含 revenue，只計 paid）',
       payment_summary: '付款摘要',
       list_attendance: '出席名單（含姓名、付款、枱號）',
@@ -177,7 +178,7 @@ export async function onRequest(context) {
       'create_member', 'update_member', 'bulk_create_members', 'upload_image'
     ],
     pricing_tiers: {
-      committee: { condition: "role != '會員'", fee_field: 'committee_fee', default: 298 },
+      committee: { condition: "role != '會員'", fee_field: 'committee_fee', default: 220 },
       member: { condition: "role = '會員'", fee_field: 'member_fee', default: 398 },
       guest: { condition: "person_type = 'guest'", fee_field: 'guest_fee', default: 398 },
       early_bird: { condition: "price_tier = 'early_bird'", fee_field: 'early_bird_fee', default: 398 },

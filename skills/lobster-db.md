@@ -108,6 +108,14 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -d '{"token":"TOKEN","action":"list_meetings"}'
 ```
 
+### update_meeting — 更新會議
+```bash
+curl -s -X POST "https://fotan.techforliving.net/api/skill" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"TOKEN","action":"update_meeting","meeting_id":10,"committee_fee":220}'
+```
+支援欄位：date, type, collector, guest_fee, member_fee, committee_fee, early_bird_fee, walk_in_fee, table_number
+
 ### meeting_stats — 會議統計（含 revenue）
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \

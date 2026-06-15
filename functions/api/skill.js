@@ -167,6 +167,20 @@ export async function onRequest(context) {
       return Response.json({ ok: true, meetings: meetings.results }, { headers: cors });
     }
 
+    // ── update_meeting ──────────────────────────────
+    if (action === 'update_meeting') {
+      const { meeting_id, date, type, collector, guest_fee, member_fee, committee_fee, early_bird_fee, walk_in_fee, table_number } = body;
+      if (!meeting_id) return Response.json({ ok: false, error: 'meeting_id required' }, { headers: cors });
+      const sets = [], vals = [];
+      for (const [k, v] of Object.entries({ date, type, collector, guest_fee, member_fee, committee_fee, early_bird_fee, walk_in_fee, table_number })) {
+        if (v !== undefined) { sets.push(k + '=?'); vals.push(v); }
+      }
+      if (!sets.length) return Response.json({ ok: false, error: 'no fields to update' }, { headers: cors });
+      vals.push(meeting_id);
+      await env.DB.prepare('UPDATE meetings SET ' + sets.join(',') + ' WHERE id=?').bind(...vals).run();
+      return Response.json({ ok: true }, { headers: cors });
+    }
+
     // ── payment_summary ─────────────────────────────
     if (action === 'payment_summary') {
       const { meeting_id } = body;
