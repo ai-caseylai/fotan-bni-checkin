@@ -489,6 +489,7 @@ body {
 .mgmt-card-btns { display: flex; gap: 6px; justify-content: flex-end; padding-top: 8px; border-top: 1px solid #f1f5f9; }
 .mgmt-detail { padding: 0 !important; }
 .mgmt-detail.show { display: block; padding-top: 8px !important; border-top: 1px solid #e2e8f0; }
+.mgmt-receipts:empty, .pc-receipts:empty { display: none; }
 .mgmt-detail .att-mini { padding: 6px 0; }
 
 /* ── Overview Person Card ───────────────────────── */

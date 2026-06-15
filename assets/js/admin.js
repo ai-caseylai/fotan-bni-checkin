@@ -103,7 +103,8 @@ async function renderOverview(pc) {
     const current = mts[0] || {};
     var detail = current.id ? await api('/meetings?id='+current.id) : null;
     var att = detail ? detail.attendance || [] : [];
-    var paidCount = att.filter(function(a){return a.payment==='paid'||a.payment==='free'}).length;
+    var paidOnlyCount = att.filter(function(a){return a.payment==='paid'}).length;
+    var freeCount = att.filter(function(a){return a.payment==='free'}).length;
     var unpaidArr = att.filter(function(a){return !a.payment||a.payment==='unpaid'});
     var unpaidCount = unpaidArr.length;
     var unpaidMemberCount = unpaidArr.filter(function(a){return a.person_type==='member'}).length;
@@ -132,7 +133,8 @@ async function renderOverview(pc) {
       <div class="stat-card"><div class="n">${arrivedCount}</div><div class="l">✅ 已簽到</div></div>
     </div>
     <div class="stat-grid">
-      <div class="stat-card"><div class="n">${paidCount}</div><div class="l">💰 已收人數</div></div>
+      <div class="stat-card"><div class="n">${paidOnlyCount}</div><div class="l">💰 收費</div></div>
+      <div class="stat-card"><div class="n">${freeCount}</div><div class="l">🆓 免費</div></div>
       <div class="stat-card"><div class="n">${unpaidCount}</div><div class="l">⚠️ 未收人數</div></div>
       <div class="stat-card"><div class="n" style="font-size:20px">會員 $${memberFee} · 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
       <div class="stat-card"><div class="n" style="color:#10b981;font-size:28px">$${revenue.toLocaleString()}</div><div class="l">💰 已收收入</div></div>
@@ -152,7 +154,8 @@ async function renderOverview(pc) {
           <div style="font-size:13px;line-height:2">
             <div>👥 會員 (${memberCount}人 × $${memberFee}) = <strong>$${(memberCount*memberFee).toLocaleString()}</strong></div>
             <div>👤 來賓 (${guestCount}人 × $${guestFee}) = <strong>$${(guestCount*guestFee).toLocaleString()}</strong></div>
-            <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px">💰 已收 (${paidCount}人) = <strong style="color:#10b981">$${revenue.toLocaleString()}</strong></div>
+            <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px">💰 收費 (${paidOnlyCount}人) = <strong style="color:#10b981">$${revenue.toLocaleString()}</strong></div>
+            <div>🆓 免費 (${freeCount}人)</div>
             <div>⚠️ 未收 (${unpaidCount}人：${unpaidMemberCount}會員+${unpaidGuestCount}來賓) ≈ <strong style="color:#f59e0b">$${unpaidTotal.toLocaleString()}</strong></div>
           </div>
         </div>
@@ -763,11 +766,13 @@ async function renderTableBody(type, list) {
           <button class="btn btn-outline btn-sm" onclick="showPersonForm('${type}',${p.id})">✏️ 編輯</button>
           <button class="btn btn-danger btn-sm" onclick="deletePerson('${type}',${p.id},'${esc(p.name)}')">🗑️</button>
         </div>
+        ${type==='member' ? '<div class="mgmt-receipts" id="rec-mgmt-'+p.id+'" style="margin-top:6px;min-height:0;display:flex;gap:4px;flex-wrap:wrap"></div>' : ''}
         ${showExpand?'<div class="detail-row mgmt-detail" id="hist-'+type+'-'+p.id+'"><div></div></div>':''}
       </div>`;
     }).join('')}</div>
     ${filtered.length===0?'<div class="empty">無匹配結果</div>':''}`;
     if (type === 'guest') loadGuestHistories(filtered);
+    if (type === 'member') loadMemberReceiptsForCards(filtered, 'mgmt');
     return;
   }
 
@@ -868,6 +873,29 @@ async function togglePersonHistory(type, pid) {
 async function loadReceipts(memberId) {
   const data = await api(`/receipts?member_id=${memberId}`);
   return Array.isArray(data) ? data : [];
+}
+
+async function loadMemberReceiptsForCards(memberList, prefix) {
+  if (!memberList || !memberList.length) return;
+  try {
+    const ids = memberList.map(p => p.id);
+    const results = await Promise.all(ids.map(id => loadReceipts(id)));
+    ids.forEach((id, i) => {
+      const el = document.getElementById('rec-' + prefix + '-' + id);
+      if (!el) return;
+      const receipts = results[i] || [];
+      if (!receipts.length) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      el.innerHTML = receipts.slice(0, prefix === 'ci' ? 2 : 3).map(r =>
+        '<a href="/api/receipts?id=' + r.id + '" target="_blank" ' +
+        'style="display:block;width:' + (prefix === 'ci' ? 36 : 48) + 'px;height:' + (prefix === 'ci' ? 36 : 48) + 'px;border-radius:6px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;line-height:0" ' +
+        'onclick="event.stopPropagation()">' +
+        '<img src="/api/receipts?id=' + r.id + '" style="width:100%;height:100%;object-fit:cover" alt="" onerror="this.parentElement.style.display=\'none\'" loading="lazy">' +
+        '</a>'
+      ).join('') + (receipts.length > (prefix === 'ci' ? 2 : 3) ?
+        '<span style="font-size:10px;color:var(--text2);background:#f1f5f9;border-radius:4px;padding:2px 5px;white-space:nowrap">+' + (receipts.length - (prefix === 'ci' ? 2 : 3)) + '</span>' : '');
+    });
+  } catch (e) {}
 }
 
 async function uploadReceipt(memberId, file) {
@@ -1136,6 +1164,7 @@ function renderCheckinOpList() {
           html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();markAbsent(\''+sec.key+'\','+p.id+',true)" style="padding:3px 6px;font-size:11px;color:#94a3b8">✕</button>';
           html += '</div>';
         }
+        if (sec.key === 'member') html += '<div class="pc-receipts" id="rec-ci-member-'+p.id+'" style="margin-top:4px;min-height:0;display:flex;gap:3px;flex-wrap:wrap;justify-content:center"></div>';
         html += '</div>';
       });
       html += '</div>';
@@ -1143,6 +1172,9 @@ function renderCheckinOpList() {
   }
   html += '<button class="btn btn-primary" style="width:100%;padding:14px;font-size:16px;margin-top:16px" id="ci-save-btn" onclick="saveCheckinOp()">💾 儲存簽到記錄</button>';
   area.innerHTML = html;
+
+  // Load receipt thumbnails for member cards
+  loadMemberReceiptsForCards(members, 'ci');
 
   // Start auto-polling
   clearInterval(ciPollTimer);
