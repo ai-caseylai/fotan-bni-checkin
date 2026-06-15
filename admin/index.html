@@ -13,6 +13,7 @@
       <h1 style="font-size:20px;font-weight:700;margin-bottom:4px">火炭會聚會</h1>
       <p style="font-size:13px;color:#64748b;margin-bottom:24px">請輸入管理密碼</p>
       <form onsubmit="doLogin();return false" style="margin:0">
+        <input type="text" style="display:none" autocomplete="username" value="admin">
         <input type="password" id="login-pwd" placeholder="密碼" autocomplete="current-password" style="width:100%;padding:12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:15px;text-align:center;margin-bottom:12px;outline:none">
         <button type="submit" class="btn btn-primary" style="width:100%">登入</button>
       </form>
@@ -99,6 +100,6 @@
   <div id="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="/assets/js/admin.js?v=30"></script>
+  <script src="/assets/js/admin.js?v=32"></script>
 </body>
 </html>

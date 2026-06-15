@@ -16,7 +16,9 @@ export async function onRequest(context) {
         const row = await env.DB.prepare('SELECT * FROM members WHERE id=?').bind(id).first();
         return Response.json(row, { headers: cors });
       }
-      const rows = await env.DB.prepare('SELECT * FROM members WHERE active=1 ORDER BY id').all();
+      const all = url.searchParams.get('all');
+      const where = all ? '1=1' : 'active=1';
+      const rows = await env.DB.prepare('SELECT * FROM members WHERE '+where+' ORDER BY id').all();
       return Response.json(rows.results, { headers: cors });
     }
     if (request.method === 'POST') {

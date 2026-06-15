@@ -23,7 +23,7 @@ export async function onRequest(context) {
       // Add attendance stats for each meeting
       for (const m of rows.results) {
         const stats = await env.DB.prepare(
-          "SELECT COUNT(*) as total, SUM(CASE WHEN person_type='member' THEN 1 ELSE 0 END) as members, SUM(CASE WHEN person_type='guest' THEN 1 ELSE 0 END) as guests, SUM(CASE WHEN payment='paid' THEN 1 ELSE 0 END) as paid, SUM(CASE WHEN (payment='' OR payment='unpaid') AND arrival_time!='absent' THEN 1 ELSE 0 END) as unpaid FROM attendance WHERE meeting_id=?"
+          "SELECT COUNT(*) as total, SUM(CASE WHEN person_type='member' THEN 1 ELSE 0 END) as members, SUM(CASE WHEN person_type='guest' THEN 1 ELSE 0 END) as guests, SUM(CASE WHEN payment='paid' THEN 1 ELSE 0 END) as paid, SUM(CASE WHEN payment='free' THEN 1 ELSE 0 END) as free, SUM(CASE WHEN (payment='' OR payment='unpaid') AND arrival_time!='absent' THEN 1 ELSE 0 END) as unpaid FROM attendance WHERE meeting_id=?"
         ).bind(m.id).first();
         m.stats = stats;
       }

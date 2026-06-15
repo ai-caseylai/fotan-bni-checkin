@@ -216,6 +216,7 @@ body {
 }
 .badge-paid { background: #d1fae5; color: #065f46; }
 .badge-unpaid { background: #fee2e2; color: #991b1b; }
+.badge-free { background: #dbeafe; color: #1e40af; }
 
 /* ── Meeting expand ─────────────────────────────── */
 .expand-tr { cursor: pointer; }

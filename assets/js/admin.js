@@ -221,8 +221,7 @@ async function toggleOverviewMeeting(mid) {
   if (row.classList.contains('show')) { row.classList.remove('show'); tr?.classList.remove('open'); return; }
   document.querySelectorAll('.detail-row.show').forEach(d => d.classList.remove('show'));
   document.querySelectorAll('.expand-tr.open').forEach(r => r.classList.remove('open'));
-  if (row.dataset.loaded) { console.log('DEBUG: already loaded, showing cached'); row.classList.add('show'); tr?.classList.add('open'); return; }
-  row.dataset.loaded = '1';
+
   tr?.classList.add('open');
 
   const m = await api('/meetings?id='+mid);
@@ -242,7 +241,7 @@ async function toggleOverviewMeeting(mid) {
         '<div class="pc-av '+a.person_type+'" style="width:32px;height:32px;font-size:13px">'+esc(name.charAt(0))+'</div>'+
         '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">'+esc(name)+'</div>'+
         '<div style="font-size:11px;color:var(--text2)">'+(absent?'缺席':esc(a.arrival_time||'—'))+'</div></div>'+
-        '<span class="badge '+(paid?'badge-paid':'badge-unpaid')+'" style="font-size:10px">'+(paid?'已付':'未付')+'</span>'+
+        '<span class="badge '+payClass(a.payment)+'" style="font-size:10px">'+payLabel(a.payment)+'</span>'+
       '</div>';
     }).join('')+
   '</div>';
@@ -294,7 +293,7 @@ async function exportDetailCSV() {
         const name = p ? p.name : '?';
         const tel = p ? (p.tel||'') : '';
         const paid = a.payment && a.payment!=='unpaid' && a.payment!=='';
-        csv += [m.date, mLblText(m.type), m.collector||'', a.person_type==='member'?'會員':'來賓', name, tel, a.arrival_time||'', paid?'已付':'未付', a.payment_method||'', (a.remark||'').replace(/,/g,';')].join(',') + '\n';
+        csv += [m.date, mLblText(m.type), m.collector||'', a.person_type==='member'?'會員':'來賓', name, tel, a.arrival_time||'', payLabel(a.payment), a.payment_method||'', (a.remark||'').replace(/,/g,';')].join(',') + '\n';
       });
     }
   }
@@ -459,40 +458,54 @@ async function toggleMeetingRow(mid) {
   document.querySelectorAll('.expand-tr.open').forEach(r => r.classList.remove('open'));
   row.classList.add('open');
 
-  if (detail.dataset.loaded) { detail.classList.add('show'); return; }
-  detail.dataset.loaded = '1';
-
   const m = await api(`/meetings?id=${mid}`);
   const att = m.attendance || [];
-  const allMembers = await api('/members');
+  const allMembers = await api('/members?all=1');
   const allGuests = await api('/guests');
   const allObservers = await api('/observers');
-  const getName = (type, id) => ({ member: allMembers, guest: allGuests, observer: allObservers }[type]||[]).find(p => p.id === id)?.name || '?';
+  const getName = (type, id) => ({ member: allMembers, guest: allGuests, observer: allObservers }[type]||[]).find(p => p.id == id)?.name || '?';
   const typeLabel = { member: '會員', guest: '來賓', observer: '觀察員' };
 
   var sortedAtt = [];
   ['member','guest','observer'].forEach(function(t){
     att.filter(function(a){return a.person_type===t}).forEach(function(a){sortedAtt.push(a)});
   });
+  sortedAtt.sort(function(a,b){ return (getName(a.person_type,a.person_id)).localeCompare(getName(b.person_type,b.person_id),'zh-Hant'); });
+
+  var filterHtml = '<div style="margin-bottom:6px;display:flex;gap:8px;align-items:center"><select onchange="filterAttendees('+mid+',this.value)" style="padding:4px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;background:#fff"><option value="all">📋 全部</option><option value="paid">✅ 已繳費</option><option value="unpaid">❌ 未繳費</option><option value="absent">✕ 缺席</option></select><span style="font-size:10px;color:var(--text2)" id="att-count-'+mid+'">共 '+att.length+' 人</span></div>';
+
   detail.firstElementChild.innerHTML = att.length === 0 ? '<div class="empty">無出席記錄</div>' :
-    '<div style="padding:8px 0">'+
+    filterHtml + '<div id="att-list-'+mid+'" style="padding:8px 0">'+
     sortedAtt.map(function(a){
       var ptype = a.person_type;
       var pname = esc(getName(ptype, a.person_id));
-      var paid = a.payment && a.payment!=='unpaid' && a.payment!=='';
+      var paid = a.payment==='paid'||a.payment==='free';
       var absent = a.arrival_time === 'absent';
+      var payCls = absent ? 'absent' : (a.payment==='free'?'free':(paid?'paid':'unpaid'));
       var safeName = pname.replace(/'/g,"\\'");
-      return '<div class="att-mini" style="cursor:pointer" onclick="event.stopPropagation();showOverviewPayOps(\''+ptype+'\','+a.person_id+','+a.id+',\''+safeName+'\','+paid+')">'+
+      return '<div class="att-mini att-'+payCls+'" style="cursor:pointer" onclick="event.stopPropagation();showOverviewPayOps(\''+ptype+'\','+a.person_id+','+a.id+',\''+safeName+'\','+paid+')">'+
         '<span style="font-size:11px;color:var(--text2);min-width:44px">'+ (typeLabel[ptype]||ptype) +'</span>'+
         '<span style="flex:1;font-weight:500">'+pname+'</span>'+
         (a.substitute ? '<span style="font-size:11px;color:var(--text2)">代:'+esc(a.substitute)+'</span>' : '')+
         '<span style="color:'+(absent?'#94a3b8':'var(--primary)')+';font-weight:500">'+(absent?'缺席':a.arrival_time||'—')+'</span>'+
-        '<span class="badge '+(paid?'badge-paid':'badge-unpaid')+'">'+(paid?'已付':'未付')+'</span>'+
+        '<span class="badge '+payClass(a.payment)+'">'+payLabel(a.payment)+'</span>'+
         (a.payment_method ? '<span style="font-size:11px">'+a.payment_method+'</span>' : '')+
       '</div>';
     }).join('')+
-    '</div>';
+    '</div></div>';
   detail.classList.add('show');
+}
+
+function filterAttendees(mid, filter) {
+  var items = document.querySelectorAll('#att-list-'+mid+' .att-mini');
+  var count = 0;
+  items.forEach(function(el) {
+    var show = filter==='all' || el.classList.contains('att-'+filter);
+    el.style.display = show ? '' : 'none';
+    if (show) count++;
+  });
+  var cntEl = document.getElementById('att-count-'+mid);
+  if (cntEl) cntEl.textContent = '共 '+count+' 人';
 }
 
 function showMeetingForm(editId) {
@@ -508,6 +521,7 @@ function showMeetingForm(editId) {
     </select>
     <label>收款人</label><input type="text" id="mt-collector" value="${esc(m.collector||'')}" placeholder="收款人名稱">
     <label>來賓費</label><input type="number" id="mt-fee" value="${m.guest_fee||0}" placeholder="0">
+    ${editId ? '' : '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="mt-add-members" checked style="width:18px;height:18px"> 複製上次會議的與會會員</label>'}
     <button class="btn btn-primary" style="width:100%" id="save-mt">${editId?'儲存':'新增會議'}</button>
   `);
   document.getElementById('save-mt').onclick = async () => {
@@ -518,10 +532,28 @@ function showMeetingForm(editId) {
       guest_fee: parseInt(document.getElementById('mt-fee').value) || 0,
       table_number: ''
     };
+    const addMembers = !editId && document.getElementById('mt-add-members')?.checked;
+    let meetingId = editId;
     if (editId) {
       await api(`/meetings?id=${editId}`, { method: 'PUT', body: JSON.stringify(body) });
     } else {
-      await api('/meetings', { method: 'POST', body: JSON.stringify(body) });
+      const result = await api('/meetings', { method: 'POST', body: JSON.stringify(body) });
+      meetingId = result.id;
+    }
+    if (addMembers && meetingId) {
+      // Copy member attendance from the last meeting
+      var lastMtg = meetings.length > 0 ? meetings[0] : null;
+      if (lastMtg) {
+        var lastAtt = await api('/attendance?meeting_id=' + lastMtg.id);
+        var memberIds = [...new Set(lastAtt.filter(a => a.person_type === 'member').map(a => a.person_id))];
+        for (var mid2 of memberIds) {
+          await api('/attendance', { method: 'POST', body: JSON.stringify({ meeting_id: meetingId, person_type: 'member', person_id: mid2 }) });
+        }
+        toast('會議已建立，已複製 ' + memberIds.length + ' 位上次與會會員');
+        hideModal();
+        switchPage('meetings');
+        return;
+      }
     }
     hideModal();
     toast(editId ? '會議已更新' : '會議已建立');
@@ -633,7 +665,7 @@ function renderTableBody(type, list) {
         } else {
           const sorted = att.sort((a,b) => b.date.localeCompare(a.date));
           const items = sorted.map(a => {
-            var paid = a.payment && a.payment !== 'unpaid' && a.payment !== '';
+            var paid = a.payment==='paid'||a.payment==='free';
             return '<span style="color:'+(paid?'#10b981':'#f59e0b')+'">'+a.date+' '+(paid?'✅':'❌')+'</span>';
           }).join(' · ');
           el.innerHTML = '📋 ' + items;
@@ -691,8 +723,7 @@ async function togglePersonHistory(type, pid) {
   document.querySelectorAll('.mgmt-card.open').forEach(r => r.classList.remove('open'));
   row?.classList.add('open');
 
-  if (detail.dataset.loaded) { detail.classList.add('show'); return; }
-  detail.dataset.loaded = '1';
+
 
   const records = await api(`/attendance?person_type=${type}&person_id=${pid}`);
   detail.firstElementChild.innerHTML = records.length === 0
@@ -701,7 +732,7 @@ async function togglePersonHistory(type, pid) {
       <span style="min-width:90px;font-weight:600">${r.date}</span>
       <span style="font-size:11px;color:var(--primary);min-width:60px;font-weight:600">${r.meeting_type==='regular'?'例會':r.meeting_type==='anniversary'?'週年聚餐':'特別會議'}</span>
       <span style="color:var(--primary);font-weight:500">${r.arrival_time||'—'}</span>
-      <span class="badge ${r.payment&&r.payment!=='unpaid'?'badge-paid':'badge-unpaid'}">${r.payment&&r.payment!=='unpaid'?'已付':'未付'}</span>
+      <span class="badge ${payClass(r.payment)}">${payLabel(r.payment)}</span>
       ${r.payment_method?`<span style="font-size:11px;color:var(--text2)">${esc(r.payment_method)}</span>`:''}
       ${r.remark?`<span style="font-size:11px;color:var(--text2)">${esc(r.remark)}</span>`:''}
     </div>`).join('');
@@ -790,10 +821,10 @@ async function showPersonForm(type, editId) {
     extra += '<label>所屬聚會</label><select id="pf-meeting"><option value="">— 未指定 —</option>'+meetings.map(m => '<option value="'+m.id+'" '+(p.meeting_id==m.id?'selected':'')+'>'+m.date+' '+mLblText(m.type)+'</option>').join('')+'</select>';
   }
 
-  const receiptSection = type === 'member' && editId ? `
+  const receiptSection = type === 'member' ? `
     <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
     <label style="font-size:14px;font-weight:700;margin-bottom:8px">付款憑證</label>
-    <div id="receipts-area" style="min-height:20px">載入中...</div>
+    <div id="receipts-area" style="min-height:20px">${editId ? '載入中...' : '儲存後即可上傳'}</div>
     <div style="margin-top:10px">
       <input type="file" id="receipt-file" accept="image/*" multiple style="font-size:13px" onchange="handleReceiptUpload(this)">
     </div>
@@ -812,6 +843,7 @@ async function showPersonForm(type, editId) {
   } else {
     window.__editMemberId = null;
   }
+  let _savedId = editId || 0;
   document.getElementById('save-pf').onclick = async () => {
     const name = document.getElementById('pf-name').value.trim();
     if (!name) return toast('請輸入名稱');
@@ -828,12 +860,21 @@ async function showPersonForm(type, editId) {
     if (type === 'guest' || type === 'observer') body.invited_by = document.getElementById('pf-invited')?.value || '';
     if (type === 'guest') { body.meeting_id = document.getElementById('pf-meeting')?.value || null; }
 
-    if (editId) {
-      await api(`/${type}s?id=${editId}`, { method: 'PUT', body: JSON.stringify(body) });
+    let result;
+    if (_savedId) {
+      await api(`/${type}s?id=${_savedId}`, { method: 'PUT', body: JSON.stringify(body) });
     } else {
-      await api(`/${type}s`, { method: 'POST', body: JSON.stringify(body) });
+      result = await api(`/${type}s`, { method: 'POST', body: JSON.stringify(body) });
     }
-    hideModal(); toast(editId ? '已更新' : '已新增');
+    if (type === 'member' && !_savedId && result && result.id) {
+      window.__editMemberId = result.id;
+      _savedId = result.id;
+      document.getElementById('receipts-area').innerHTML = '已建立會員 #'+result.id+'，可上傳憑證';
+      toast('會員已建立，可上傳付款憑證');
+      document.getElementById('save-pf').textContent = '儲存';
+      return;
+    }
+    hideModal(); toast(_savedId ? '已更新' : '已新增');
     await loadAllData();
     const el = document.getElementById('tbl-body');
     if (el) renderTableBody(type, { member: members, guest: guests, observer: observers }[type]);
@@ -939,7 +980,7 @@ function renderCheckinOpList() {
           html += '<td style="padding:6px 8px"><span style="font-size:10px;color:#94a3b8">缺席</span></td>';
           html += '<td style="padding:6px 8px"><button class="btn btn-outline btn-sm" onclick="markAbsent(\''+sec.key+'\','+p.id+',false)" style="font-size:10px;padding:2px 6px">↩ 取消</button></td>';
         } else {
-          html += '<td style="padding:6px 8px"><span class="badge '+(paid?'badge-paid':'badge-unpaid')+'" style="cursor:pointer;font-size:10px;padding:3px 6px" onclick="togglePayOp(\''+sec.key+'\','+p.id+')">'+(paid?'已付':'未付')+'</span></td>';
+          html += '<td style="padding:6px 8px"><span class="badge '+payClass(att?att.payment:'')+'" style="cursor:pointer;font-size:10px;padding:3px 6px" onclick="togglePayOp(\''+sec.key+'\','+p.id+')">'+payLabel(att?att.payment:'')+'</span></td>';
           html += '<td style="padding:6px 8px"><div style="display:flex;gap:3px">';
           html += '<button class="btn btn-outline btn-sm" onclick="setTimeOp(\''+sec.key+'\','+p.id+')" style="font-size:10px;padding:2px 6px">🕐</button>';
           html += '<button class="btn btn-outline btn-sm" onclick="markAbsent(\''+sec.key+'\','+p.id+',true)" style="font-size:10px;padding:2px 5px;color:#94a3b8">✕</button>';
@@ -967,7 +1008,7 @@ function renderCheckinOpList() {
         } else {
           html += '<div class="pc-row">';
           html += '<span class="pc-time">'+(att?.arrival_time||'—')+'</span>';
-          html += '<span class="badge '+(paid?'badge-paid':'badge-unpaid')+'" style="cursor:pointer;font-size:11px;padding:4px 8px" onclick="event.stopPropagation();togglePayOp(\''+sec.key+'\','+p.id+')">'+(paid?'已付':'未付')+'</span>';
+          html += '<span class="badge '+payClass(att?att.payment:'')+'" style="cursor:pointer;font-size:11px;padding:4px 8px" onclick="event.stopPropagation();togglePayOp(\''+sec.key+'\','+p.id+')">'+payLabel(att?att.payment:'')+'</span>';
           html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();setTimeOp(\''+sec.key+'\','+p.id+')" style="padding:3px 8px;font-size:11px">🕐</button>';
           html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();markAbsent(\''+sec.key+'\','+p.id+',true)" style="padding:3px 6px;font-size:11px;color:#94a3b8">✕</button>';
           html += '</div>';
@@ -1003,9 +1044,16 @@ function getOrCreateOpAtt(type, pid) {
   if (!att) { att = { person_type: type, person_id: pid, substitute: '', payment: '', payment_method: '', arrival_time: '', remark: '' }; meetingAttendance.push(att); }
   return att;
 }
+function payLabel(p) { return p==='free'?'免費':p==='paid'?'已付':'未付'; }
+function payClass(p) { return p==='free'?'badge-free':p==='paid'?'badge-paid':'badge-unpaid'; }
+function isPaidOrFree(p) { return p==='paid'||p==='free'; }
+
 function togglePayOp(type, pid) {
   const att = getOrCreateOpAtt(type, pid);
-  att.payment = (att.payment === 'paid') ? '' : 'paid';
+  // Cycle: unpaid → paid → free → unpaid
+  if (!att.payment || att.payment === 'unpaid' || att.payment === '') att.payment = 'paid';
+  else if (att.payment === 'paid') att.payment = 'free';
+  else att.payment = '';
   renderCheckinOpList();
 }
 function markAbsent(type, pid, absent) {
@@ -1110,6 +1158,7 @@ async function renderSettingsPage(pc) {
         { key: 'confirmTitle', label: '確認對話標題', placeholder: '確認簽到？' },
         { key: 'cancel', label: '取消按鈕文字', placeholder: '取消' },
         { key: 'confirm', label: '確認按鈕文字', placeholder: '✓ 確認' },
+        { key: 'skipCheckin', label: '「跳過，直接簽到」按鈕', type: 'select', options: [{v:'1',l:'使用按鈕'},{v:'0',l:'不使用按鈕'}] },
       ]
     },
     {
@@ -1173,7 +1222,15 @@ async function renderSettingsPage(pc) {
         allFields.push(f);
         html += '<div class="settings-field">';
         html += '<label class="settings-label">'+f.label+'</label>';
-        html += '<input type="text" class="settings-input" id="set-'+f.key+'" value="'+esc(settings[f.key]||'')+'" placeholder="'+esc(f.placeholder||'')+'">';
+        if (f.type === 'select' && f.options) {
+          html += '<select class="settings-input" id="set-'+f.key+'" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:#fff;outline:none">';
+          f.options.forEach(o => {
+            html += '<option value="'+o.v+'"'+(settings[f.key]===o.v?' selected':'')+'>'+o.l+'</option>';
+          });
+          html += '</select>';
+        } else {
+          html += '<input type="text" class="settings-input" id="set-'+f.key+'" value="'+esc(settings[f.key]||'')+'" placeholder="'+esc(f.placeholder||'')+'">';
+        }
         html += '</div>';
       });
       html += '</div>';
@@ -1261,7 +1318,9 @@ async function loadAllData() {
 }
 
 async function api(path, opts = {}) {
-  const res = await fetch(API + path, {
+  var sep = path.includes('?') ? '&' : '?';
+  var url = API + path + sep + '_t=' + Date.now();
+  const res = await fetch(url, {
     headers: opts.body ? { 'Content-Type': 'application/json' } : {},
     ...opts,
   });
@@ -1540,7 +1599,7 @@ async function showPersonOps(type, pid) {
     <div style="font-size:13px;color:var(--text2);margin-bottom:12px">
       ${type==='member'?'會員':'來賓'} · ${p.tel?'📱 '+esc(p.tel):''} ${p.email?'· 📧 '+esc(p.email):''}
     </div>
-    ${att?'<div style="background:#f0fdfa;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px">簽到時間: <strong>'+(absent?'缺席':esc(att.arrival_time||'—'))+'</strong> · 付款: <strong>'+(paid?'已付':'未付')+'</strong></div>':''}
+    ${att?'<div style="background:#f0fdfa;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px">簽到時間: <strong>'+(absent?'缺席':esc(att.arrival_time||'—'))+'</strong> · 付款: <strong>'+payLabel(att?att.payment:'')+'</strong></div>':''}
     ${actionsHtml}
     ${receiptHtml}
   `);

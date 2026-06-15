@@ -98,7 +98,7 @@ var meeting=null,members=[],guests=[],observers=[],checked=[],locked=false,last=
 var D={
   lunchFee:'388',paymeLink:'https://payme.hsbc/fotan',
   wcLink:'https://pay.weixin.qq.com/',aliLink:'https://www.alipayhk.com/',fpsPhone:'97188675',aliQrImg:'',fpsQrImg:'',
-  tableNumber:'8',productIntro:'',aboutUs:'',joinLink:'',
+  tableNumber:'8',productIntro:'',aboutUs:'',joinLink:'',skipCheckin:'1',
   schedule:'12:30 報到及交流\n12:45 例會正式開始\n13:00 會員介紹 (30秒每位)\n13:20 專題分享\n13:40 來賓介紹\n14:00 商業引薦\n14:30 午宴及自由交流\n15:00 活動結束',
   chairmanMsg:'感謝您今天蒞臨火炭會聚會！\n期待每個月也可以見面！'
 };
@@ -281,7 +281,7 @@ if(D.aliLink)h+='<a href="javascript:void(0)" onclick="showAlipayQR('+fee+')" st
       h+='<div id="upload-status" style="margin-top:8px;font-size:12px"></div>';
       h+='</div>';
 
-      h+='<button onclick="directCheckin('+last.attId+')" class="btn btn-ghost">跳過，直接簽到</button>';
+      if(D.skipCheckin!=='0') h+='<button onclick="directCheckin('+last.attId+')" class="btn btn-ghost">跳過，直接簽到</button>';
     }
     h+='</div>';
     main.innerHTML=h;
