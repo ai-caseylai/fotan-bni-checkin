@@ -1913,7 +1913,7 @@ async function renderSkillPage(pc) {
       <div class="panel-body" style="padding:16px;text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="downloadSkill()">🦞 下載 Skill 檔</button>
         <button class="btn btn-outline" onclick="downloadAPIManual()">📋 下載 API 手冊</button>
-        <button class="btn btn-outline" onclick="window.open('/docs/USER_GUIDE.md')">📖 使用手冊</button>
+        <button class="btn btn-outline" onclick="window.open('/docs/')">📖 使用手冊</button>
       </div>
       <div style="padding:0 16px 16px;font-size:11px;color:var(--text2);text-align:center">
         Skill 檔放 OpenClaw / Claude Code skills 目錄即可使用
