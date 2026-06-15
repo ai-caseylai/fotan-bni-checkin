@@ -132,7 +132,7 @@ async function renderOverview(pc) {
     <div class="stat-grid">
       <div class="stat-card"><div class="n">${paidCount}</div><div class="l">💰 已收人數</div></div>
       <div class="stat-card"><div class="n">${unpaidCount}</div><div class="l">⚠️ 未收人數</div></div>
-      <div class="stat-card"><div class="n" style="font-size:22px">會員 $${lunchFee} · 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
+      <div class="stat-card"><div class="n" style="font-size:22px">會員 $${memberFee} · 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
       <div class="stat-card"><div class="n" style="color:#10b981;font-size:28px">$${revenue.toLocaleString()}</div><div class="l">💰 預計總收入</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
