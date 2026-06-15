@@ -104,13 +104,17 @@ async function renderOverview(pc) {
     var detail = current.id ? await api('/meetings?id='+current.id) : null;
     var att = detail ? detail.attendance || [] : [];
     var paidCount = att.filter(function(a){return a.payment==='paid'||a.payment==='free'}).length;
-    var unpaidCount = att.filter(function(a){return !a.payment||a.payment==='unpaid'}).length;
+    var unpaidArr = att.filter(function(a){return !a.payment||a.payment==='unpaid'});
+    var unpaidCount = unpaidArr.length;
+    var unpaidMemberCount = unpaidArr.filter(function(a){return a.person_type==='member'}).length;
+    var unpaidGuestCount = unpaidArr.filter(function(a){return a.person_type==='guest'}).length;
     var memberCount = att.filter(function(a){return a.person_type==='member'}).length;
     var guestCount = att.filter(function(a){return a.person_type==='guest'}).length;
     var arrivedCount = att.filter(function(a){return a.arrival_time&&a.arrival_time!=='absent'}).length;
     var revenue = current.stats?.revenue || stats.revenue || 0;
-    var lunchFee = current.member_fee || 388;
+    var memberFee = current.member_fee || 388;
     var guestFee = current.guest_fee || 380;
+    var unpaidTotal = unpaidMemberCount*memberFee + unpaidGuestCount*guestFee;
 
     pc.innerHTML = `
     <div class="panel" style="margin-bottom:16px">
@@ -140,10 +144,10 @@ async function renderOverview(pc) {
         <div class="panel-header"><h2>📊 收入摘要</h2></div>
         <div class="panel-body" style="padding:16px">
           <div style="font-size:13px;line-height:2">
-            <div>👥 會員 (${memberCount}人 × $${lunchFee}) = <strong>$${(memberCount*lunchFee).toLocaleString()}</strong></div>
+            <div>👥 會員 (${memberCount}人 × $${memberFee}) = <strong>$${(memberCount*memberFee).toLocaleString()}</strong></div>
             <div>👤 來賓 (${guestCount}人 × $${guestFee}) = <strong>$${(guestCount*guestFee).toLocaleString()}</strong></div>
             <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px">💰 已收 (${paidCount}人) = <strong style="color:#10b981">$${revenue.toLocaleString()}</strong></div>
-            <div>⚠️ 未收 (${unpaidCount}人) ≈ <strong style="color:#f59e0b">$${((unpaidCount*lunchFee).toLocaleString())}</strong></div>
+            <div>⚠️ 未收 (${unpaidCount}人：${unpaidMemberCount}會員+${unpaidGuestCount}來賓) ≈ <strong style="color:#f59e0b">$${unpaidTotal.toLocaleString()}</strong></div>
           </div>
         </div>
       </div>
