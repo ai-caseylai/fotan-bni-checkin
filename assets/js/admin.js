@@ -100,6 +100,7 @@ async function renderOverview(pc) {
   try {
     const stats = await api('/stats');
     const mts = await api('/meetings');
+    const allGuests = await api('/guests');
     const current = mts[0] || {};
     var detail = current.id ? await api('/meetings?id='+current.id) : null;
     var att = detail ? detail.attendance || [] : [];
@@ -112,12 +113,22 @@ async function renderOverview(pc) {
     var memberCount = att.filter(function(a){return a.person_type==='member'}).length;
     var guestCount = att.filter(function(a){return a.person_type==='guest'}).length;
     var arrivedCount = att.filter(function(a){return a.arrival_time&&a.arrival_time!=='absent'}).length;
+    var committeeCount = att.filter(function(a){return a.price_tier==='committee'}).length;
+    var regularMemberCount = memberCount - committeeCount;
     var revenue = current.stats?.revenue || stats.revenue || 0;
     var memberFee = current.member_fee || 388;
     var guestFee = current.guest_fee || 380;
-    var unpaidTotal = unpaidMemberCount*memberFee + unpaidGuestCount*guestFee;
+    var committeeFee = current.committee_fee || 220;
+    var vipMap = {}; allGuests.forEach(function(g){ vipMap[g.id] = g.vip; });
+    var vipGuestCount = att.filter(function(a){return a.person_type==='guest' && vipMap[a.person_id]==1}).length;
+    var regularGuestCount = guestCount - vipGuestCount;
+    var unpaidVipCount = unpaidArr.filter(function(a){return a.person_type==='guest' && vipMap[a.person_id]==1}).length;
+    var unpaidRegularGuestCount = unpaidGuestCount - unpaidVipCount;
+    var unpaidCommitteeCount = unpaidArr.filter(function(a){return a.price_tier==='committee'}).length;
+    var unpaidRegularMemberCount = unpaidMemberCount - unpaidCommitteeCount;
+    var unpaidTotal = unpaidRegularMemberCount*memberFee + unpaidCommitteeCount*committeeFee + unpaidRegularGuestCount*guestFee;
 
-    var expectedTotal = memberCount*memberFee + guestCount*guestFee;
+    var expectedTotal = regularMemberCount*memberFee + committeeCount*committeeFee + guestCount*guestFee;
 
     pc.innerHTML = `
     <div class="panel" style="margin-bottom:16px">
@@ -128,15 +139,18 @@ async function renderOverview(pc) {
     </div>
     <div class="stat-grid">
       <div class="stat-card"><div class="n">${att.length}</div><div class="l">👥 總出席人數</div></div>
-      <div class="stat-card"><div class="n">${memberCount}</div><div class="l">會員</div></div>
-      <div class="stat-card"><div class="n">${guestCount}</div><div class="l">來賓</div></div>
+      <div class="stat-card"><div class="n">${committeeCount}</div><div class="l">🏅 委員</div></div>
+      <div class="stat-card"><div class="n">${regularMemberCount}</div><div class="l">👤 會員</div></div>
+      <div class="stat-card"><div class="n">${vipGuestCount}</div><div class="l">⭐ 嘉賓</div></div>
+      <div class="stat-card"><div class="n">${regularGuestCount}</div><div class="l">👥 來賓</div></div>
       <div class="stat-card"><div class="n">${arrivedCount}</div><div class="l">✅ 已簽到</div></div>
     </div>
     <div class="stat-grid">
       <div class="stat-card"><div class="n">${paidOnlyCount}</div><div class="l">💰 收費</div></div>
       <div class="stat-card"><div class="n">${freeCount}</div><div class="l">🆓 免費</div></div>
       <div class="stat-card"><div class="n">${unpaidCount}</div><div class="l">⚠️ 未收人數</div></div>
-      <div class="stat-card"><div class="n" style="font-size:20px">會員 $${memberFee} · 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
+      <div class="stat-card"><div class="n" style="font-size:16px">🏅 委員 $${committeeFee} · 會員 $${memberFee}</div><div class="l">🏷️ 收費標準</div></div>
+      <div class="stat-card"><div class="n" style="font-size:16px">⭐ 嘉賓 免費 · 👥 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
       <div class="stat-card"><div class="n" style="color:#10b981;font-size:28px">$${revenue.toLocaleString()}</div><div class="l">💰 已收收入</div></div>
     </div>
     <div class="stat-grid">
@@ -152,11 +166,13 @@ async function renderOverview(pc) {
         <div class="panel-header"><h2>📊 收入摘要</h2></div>
         <div class="panel-body" style="padding:16px">
           <div style="font-size:13px;line-height:2">
-            <div>👥 會員 (${memberCount}人 × $${memberFee}) = <strong>$${(memberCount*memberFee).toLocaleString()}</strong></div>
-            <div>👤 來賓 (${guestCount}人 × $${guestFee}) = <strong>$${(guestCount*guestFee).toLocaleString()}</strong></div>
+            <div>🏅 委員 (${committeeCount}人 × $${committeeFee}) = <strong>$${(committeeCount*committeeFee).toLocaleString()}</strong></div>
+            <div>👤 會員 (${regularMemberCount}人 × $${memberFee}) = <strong>$${(regularMemberCount*memberFee).toLocaleString()}</strong></div>
+            <div>⭐ 嘉賓 (${vipGuestCount}人 · 免費) = <strong>$0</strong></div>
+            <div>👥 來賓 (${regularGuestCount}人 × $${guestFee}) = <strong>$${(regularGuestCount*guestFee).toLocaleString()}</strong></div>
             <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px">💰 收費 (${paidOnlyCount}人) = <strong style="color:#10b981">$${revenue.toLocaleString()}</strong></div>
             <div>🆓 免費 (${freeCount}人)</div>
-            <div>⚠️ 未收 (${unpaidCount}人：${unpaidMemberCount}會員+${unpaidGuestCount}來賓) ≈ <strong style="color:#f59e0b">$${unpaidTotal.toLocaleString()}</strong></div>
+            <div>⚠️ 未收 <strong>${unpaidCount}人</strong> ≈ <strong style="color:#f59e0b">$${unpaidTotal.toLocaleString()}</strong></div>
           </div>
         </div>
       </div>
@@ -969,6 +985,7 @@ async function showPersonForm(type, editId) {
   }
   if (type === 'guest') {
     extra += '<label>邀請人</label><input type="text" id="pf-invited" value="'+esc(p.invited_by||'')+'" placeholder="邀請人名稱">';
+    extra += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pf-vip" '+(p.vip==1?'checked':'')+' style="width:auto;margin:0"> ⭐ VIP 嘉賓</label>';
   }
   if (type === 'guest') {
     extra += '<label>所屬聚會</label><select id="pf-meeting"><option value="">— 未指定 —</option>'+meetings.map(m => '<option value="'+m.id+'" '+(p.meeting_id==m.id?'selected':'')+'>'+m.date+' '+mLblText(m.type)+'</option>').join('')+'</select>';
@@ -1011,6 +1028,7 @@ async function showPersonForm(type, editId) {
     if (type === 'guest') body.professional = document.getElementById('pf-prof')?.value || '';
     if (type === 'observer') body.chapter = document.getElementById('pf-chapter')?.value || '';
     if (type === 'guest') body.invited_by = document.getElementById('pf-invited')?.value || '';
+    if (type === 'guest') body.vip = document.getElementById('pf-vip')?.checked ? 1 : 0;
     if (type === 'guest') { body.meeting_id = document.getElementById('pf-meeting')?.value || null; }
 
     let result;
@@ -1110,8 +1128,10 @@ function renderCheckinOpList() {
   '</div>';
 
   const sections = [
-    { key: 'member', label: '會員', list: members },
-    { key: 'guest', label: '來賓', list: guests },
+    { key: 'member', label: '🏅 委員', list: members.filter(function(p){return p.role==='主席'||p.role==='副主席'||p.role==='秘書長'||p.role==='幹事'}) },
+    { key: 'member', label: '👤 會員', list: members.filter(function(p){return !p.role||p.role==='會員'||(p.role!=='主席'&&p.role!=='副主席'&&p.role!=='秘書長'&&p.role!=='幹事')}) },
+    { key: 'guest', label: '⭐ 嘉賓', list: guests.filter(function(p){return p.vip==1}) },
+    { key: 'guest', label: '👥 來賓', list: guests.filter(function(p){return !p.vip||p.vip==0}) },
   ];
 
   if (ciViewMode === 'table') {
@@ -1224,13 +1244,35 @@ function markAbsent(type, pid, absent) {
 }
 async function autoArriveAndShow(type, pid, name) {
   var att = getOrCreateOpAtt(type, pid);
+  // 未付款 → 打開付費模態頁
+  if (!isPaidOrFree(att.payment)) {
+    renderCheckinOpList();
+    showCheckinPersonOps(type, pid, name);
+    return;
+  }
   if (!att.arrival_time || att.arrival_time === 'absent') {
-    var now = new Date();
-    att.arrival_time = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-    // Save to server
-    if (att.id) {
-      await api('/attendance', {method:'PUT',body:JSON.stringify({id:att.id,arrival_time:att.arrival_time})});
-    }
+    // 已付款但未簽到，確認後才記錄時間
+    showModal('✅ 確認簽到',
+      '<div style="max-width:320px;margin:0 auto;text-align:center">' +
+      '<p style="margin-bottom:16px;font-size:14px">確定要為 <strong>' + esc(name) + '</strong> 簽到嗎？</p>' +
+      '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-outline" style="flex:1" onclick="hideModal()">取消</button>' +
+      '<button class="btn btn-primary" style="flex:1" onclick="confirmCheckin(\'' + type + '\',' + pid + ',\'' + esc(name) + '\')">確認簽到</button>' +
+      '</div></div>'
+    );
+    return;
+  }
+  renderCheckinOpList();
+  showCheckinPersonOps(type, pid, name);
+}
+
+async function confirmCheckin(type, pid, name) {
+  hideModal();
+  var att = getOrCreateOpAtt(type, pid);
+  var now = new Date();
+  att.arrival_time = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  if (att.id) {
+    await api('/attendance', {method:'PUT',body:JSON.stringify({id:att.id,arrival_time:att.arrival_time})});
   }
   renderCheckinOpList();
   showCheckinPersonOps(type, pid, name);
@@ -1356,6 +1398,7 @@ async function uploadCheckinReceipt(memberId, type) {
 }
 function setTimeOp(type, pid) {
   const att = getOrCreateOpAtt(type, pid);
+  if (!isPaidOrFree(att.payment)) { toast('❌ 尚未付款，無法設定簽到時間'); return; }
   const now = new Date();
   const hh=String(now.getHours()).padStart(2,'0'), mm=String(now.getMinutes()).padStart(2,'0');
   showModal('設定時間', `<input type="time" id="op-time" value="${att.arrival_time||`${hh}:${mm}`}"><div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-outline" style="flex:1" onclick="hideModal()">取消</button><button class="btn btn-primary" style="flex:1" id="save-op-time">確認</button></div>`);
@@ -1367,7 +1410,10 @@ function setTimeOp(type, pid) {
 async function saveCheckinOp() {
   if (!currentMeeting) return toast('請先選擇會議');
   for (const att of meetingAttendance) {
-    await api('/attendance', { method: 'POST', body: JSON.stringify({ meeting_id: currentMeeting.id, ...att }) });
+    const payload = { meeting_id: currentMeeting.id, ...att };
+    // 未付款不清除 arrival_time
+    if (!isPaidOrFree(att.payment)) delete payload.arrival_time;
+    await api('/attendance', { method: 'POST', body: JSON.stringify(payload) });
   }
   toast('簽到記錄已儲存！');
 }
@@ -1900,7 +1946,7 @@ function esc(s) {
   if (!s) return '';
   const d = document.createElement('div');
   d.textContent = s;
-  return d.innerHTML;
+  return d.innerHTML.replace(/'/g, "\\'");
 }
 let toastTimer;
 function toast(msg) {

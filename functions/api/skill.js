@@ -106,6 +106,13 @@ export async function onRequest(context) {
     if (action === 'mark_arrival') {
       const { attendance_id, arrival_time } = body;
       if (!attendance_id) return Response.json({ ok: false, error: 'attendance_id required' }, { headers: cors });
+      // 未付款不能簽到
+      if (arrival_time && arrival_time !== 'absent') {
+        const row = await env.DB.prepare('SELECT payment FROM attendance WHERE id=?').bind(attendance_id).first();
+        if (!row || (row.payment !== 'paid' && row.payment !== 'free')) {
+          return Response.json({ ok: false, error: '未付款不能簽到，請先完成付款' }, { headers: cors });
+        }
+      }
       await env.DB.prepare('UPDATE attendance SET arrival_time=? WHERE id=?')
         .bind(arrival_time || 'absent', attendance_id).run();
       return Response.json({ ok: true, message: `已標記 attendance #${attendance_id} 為 ${arrival_time || 'absent'}` }, { headers: cors });

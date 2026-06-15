@@ -13,7 +13,7 @@ export async function onRequest(context) {
   const doc = {
     system: {
       name: '火炭會聚會簽到系統 (Fotan BNI Check-in)',
-      version: '3.7',
+      version: '3.8',
       base_url: 'https://fotan.techforliving.net',
       api_base: 'https://fotan.techforliving.net/api',
       description: '香港火炭商會每月聚會簽到及管理系統',
@@ -61,9 +61,9 @@ export async function onRequest(context) {
       '/api/guests': {
         methods: 'GET,POST,PUT,DELETE',
         auth: 'Cookie',
-        get: { params: '?id=X' },
-        post: { body: '{name,tel,professional,invited_by,meeting_id}' },
-        put: { body: '{id,name,tel,professional,invited_by,meeting_id}' },
+        get: { params: '?id=X 或 ?meeting_id=X' },
+        post: { body: '{name,tel,professional,invited_by,meeting_id,vip（0/1）}' },
+        put: { body: '{id,name,tel,professional,invited_by,meeting_id,vip,table_number}' },
       },
       '/api/auth': {
         methods: 'GET,POST',
@@ -160,7 +160,7 @@ export async function onRequest(context) {
       search: '搜尋人員 {q}',
       update_payment: '更新付款 {attendance_id,payment（paid/free/unpaid）}',
       update_table: '設定枱號 {meeting_id,person_type,person_id,table_number}',
-      mark_arrival: '標記簽到 {attendance_id,arrival_time（HH:MM 或 absent）}',
+      mark_arrival: '標記簽到 {attendance_id,arrival_time（HH:MM 或 absent）} — 未付款不能簽到',
       list_meetings: '列出所有會議',
       update_meeting: '更新會議 {meeting_id,date,type,guest_fee,member_fee,committee_fee,...}',
       meeting_stats: '會議統計（含 revenue，只計 paid）',
@@ -178,11 +178,17 @@ export async function onRequest(context) {
       'create_member', 'update_member', 'bulk_create_members', 'upload_image'
     ],
     pricing_tiers: {
-      committee: { condition: "role != '會員'", fee_field: 'committee_fee', default: 220 },
-      member: { condition: "role = '會員'", fee_field: 'member_fee', default: 398 },
-      guest: { condition: "person_type = 'guest'", fee_field: 'guest_fee', default: 398 },
+      committee: { condition: "role IN ('主席','副主席','秘書長','幹事') OR price_tier='committee'", fee_field: 'committee_fee', default: 220 },
+      member: { condition: "role = '會員' OR role NOT IN ('主席','副主席','秘書長','幹事')", fee_field: 'member_fee', default: 398 },
+      guest: { condition: "person_type = 'guest'", fee_field: 'guest_fee', default: 398, vip: '⭐ 嘉賓 vip=1' },
       early_bird: { condition: "price_tier = 'early_bird'", fee_field: 'early_bird_fee', default: 398 },
       walk_in: { condition: "price_tier = 'walk_in'", fee_field: 'walk_in_fee', default: 398 },
+    },
+    checkin_rules: {
+      unpaid_blocked: '未付款（payment≠paid 且≠free）不能記錄簽到時間',
+      payment_first: '簽到頁點擊未付款卡片 → 自動打開付費模態頁',
+      confirm_paid: '簽到頁點擊已付款卡片 → 確認對話框後記錄時間',
+      enforced_layers: ['admin.js 前端', 'attendance API PUT/POST', 'chatbot mark_arrival', 'skill API mark_arrival'],
     },
     payment_states: {
       paid: '💰 已付款 — 計入營收',
@@ -191,6 +197,9 @@ export async function onRequest(context) {
     },
     important_notes: [
       'v3.7 起 revenue 只計算 payment=paid，不含 free',
+      'v3.8 簽到操作：未付款不能簽到（全線 API + 前端 + chatbot + skill 已統一）',
+      'v3.8 嘉賓 VIP 欄位：guests.vip（1=嘉賓 ⭐，0=來賓 🚶）',
+      'v3.8 委員角色：主席/副主席/秘書長/幹事，委員價 $220',
       'meeting_stats、stats、meetings 三個端點的 revenue 計算已全線同步',
       '部署必須使用 wrangler@3（v4.100.0 有 Functions 遺失 bug）',
       'group JID 含 "-" 或以 "120363" 開頭且長度 > 15 需加 @g.us 後綴',

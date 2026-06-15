@@ -10,8 +10,8 @@ export function getTools() {
     { type: 'function', function: { name: 'get_guest_list', description: '取得來賓列表', parameters: { type: 'object', properties: {}, required: [] } } },
     { type: 'function', function: { name: 'get_payment_summary', description: '查詢會議付款摘要', parameters: { type: 'object', properties: { meeting_id: { type: 'integer' } }, required: [] } } },
     { type: 'function', function: { name: 'get_industry_list', description: '取得行業分類列表', parameters: { type: 'object', properties: {}, required: [] } } },
-    { type: 'function', function: { name: 'add_guest', description: '新增來賓', parameters: { type: 'object', properties: { name: { type: 'string' }, professional: { type: 'string' }, tel: { type: 'string' }, invited_by: { type: 'string' }, meeting_id: { type: 'integer' } }, required: ['name'] } } },
-    { type: 'function', function: { name: 'bulk_add_guests', description: '批次匯入來賓名單，支援姓名、專業、邀請人、付款狀態。當用戶提供名單或列表時使用。每筆會自動檢查重複並建立出席記錄。', parameters: { type: 'object', properties: { guests: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, professional: { type: 'string' }, tel: { type: 'string' }, invited_by: { type: 'string' }, payment: { type: 'string', description: 'paid/已付 或 unpaid/未付' } }, required: ['name'] } }, meeting_id: { type: 'integer', description: '會議ID，預設最新會議' } }, required: ['guests'] } } },
+    { type: 'function', function: { name: 'add_guest', description: '新增來賓', parameters: { type: 'object', properties: { name: { type: 'string' }, professional: { type: 'string' }, tel: { type: 'string' }, invited_by: { type: 'string' }, meeting_id: { type: 'integer' }, vip: { type: 'integer', description: '1=VIP嘉賓 0=來賓' } }, required: ['name'] } } },
+    { type: 'function', function: { name: 'bulk_add_guests', description: '批次匯入來賓名單，支援姓名、專業、邀請人、付款狀態、VIP標記。當用戶提供名單或列表時使用。每筆會自動檢查重複並建立出席記錄。', parameters: { type: 'object', properties: { guests: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, professional: { type: 'string' }, tel: { type: 'string' }, invited_by: { type: 'string' }, payment: { type: 'string', description: 'paid/已付 或 unpaid/未付' }, vip: { type: 'integer', description: '1=VIP嘉賓' } }, required: ['name'] } }, meeting_id: { type: 'integer', description: '會議ID，預設最新會議' } }, required: ['guests'] } } },
     { type: 'function', function: { name: 'add_meeting', description: '新增會議（可設定多層收費）', parameters: { type: 'object', properties: { date: { type: 'string' }, type: { type: 'string' }, collector: { type: 'string' }, guest_fee: { type: 'integer' }, member_fee: { type: 'integer' }, committee_fee: { type: 'integer' }, early_bird_fee: { type: 'integer' }, walk_in_fee: { type: 'integer' } }, required: ['date', 'type'] } } },
     { type: 'function', function: { name: 'update_payment', description: '更新出席記錄的付款狀態', parameters: { type: 'object', properties: { attendance_id: { type: 'integer' }, payment: { type: 'string', description: 'paid/free/unpaid' } }, required: ['attendance_id', 'payment'] } } },
     { type: 'function', function: { name: 'update_table', description: '設定枱號', parameters: { type: 'object', properties: { meeting_id: { type: 'integer' }, person_type: { type: 'string' }, person_id: { type: 'integer' }, table_number: { type: 'string' } }, required: ['meeting_id', 'person_type', 'person_id', 'table_number'] } } },
@@ -19,8 +19,8 @@ export function getTools() {
     { type: 'function', function: { name: 'get_settings', description: '查詢系統設定', parameters: { type: 'object', properties: {}, required: [] } } },
     { type: 'function', function: { name: 'delete_attendance', description: '刪除出席記錄', parameters: { type: 'object', properties: { attendance_id: { type: 'integer' } }, required: ['attendance_id'] } } },
     { type: 'function', function: { name: 'get_receipts', description: '查詢會員付款憑證', parameters: { type: 'object', properties: { member_id: { type: 'integer' } }, required: ['member_id'] } } },
-    { type: 'function', function: { name: 'create_member', description: '新增會員', parameters: { type: 'object', properties: { name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' } }, required: ['name'] } } },
-    { type: 'function', function: { name: 'update_member', description: '更新會員資料', parameters: { type: 'object', properties: { member_id: { type: 'integer' }, name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' }, fee_paid_date: { type: 'string' }, bio: { type: 'string' } }, required: ['member_id'] } } },
+    { type: 'function', function: { name: 'create_member', description: '新增會員', parameters: { type: 'object', properties: { name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string', description: '會員/主席/副主席/秘書長/幹事' } }, required: ['name'] } } },
+    { type: 'function', function: { name: 'update_member', description: '更新會員資料', parameters: { type: 'object', properties: { member_id: { type: 'integer' }, name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string', description: '會員/主席/副主席/秘書長/幹事' }, fee_paid_date: { type: 'string' }, bio: { type: 'string' } }, required: ['member_id'] } } },
     { type: 'function', function: { name: 'bulk_create_members', description: '批次匯入會員名單（Excel/CSV 匯入）', parameters: { type: 'object', properties: { members: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' }, fee_paid_date: { type: 'string' } }, required: ['name'] } } }, required: ['members'] } } },
     { type: 'function', function: { name: 'upload_image', description: '上傳圖片到系統（QR Code、設定圖片等）', parameters: { type: 'object', properties: { name: { type: 'string', description: 'R2 檔名，如 qr-alipay' }, data: { type: 'string', description: 'Base64 圖片數據' }, content_type: { type: 'string', description: 'image/png 或 image/jpeg' } }, required: ['name', 'data'] } } }
   ];
@@ -109,8 +109,8 @@ export async function executeFunction(env, name, args) {
       if (existG || existM) return JSON.stringify({ error: '已存在：' + args.name + '（會員或來賓中重複）' });
       let mid = await env.DB.prepare('SELECT id FROM meetings ORDER BY date DESC LIMIT 1').first();
       mid = mid ? mid.id : null;
-      const result = await env.DB.prepare('INSERT INTO guests (name, professional, tel, invited_by, meeting_id) VALUES (?,?,?,?,?)')
-        .bind(args.name, args.professional || '', args.tel || '', args.invited_by || '', mid).run();
+      const result = await env.DB.prepare('INSERT INTO guests (name, professional, tel, invited_by, meeting_id, vip) VALUES (?,?,?,?,?,?)')
+        .bind(args.name, args.professional || '', args.tel || '', args.invited_by || '', mid, args.vip ? 1 : 0).run();
       if (mid) {
         await env.DB.prepare('INSERT INTO attendance (meeting_id, person_type, person_id, payment) VALUES (?,?,?,?)')
           .bind(mid, 'guest', result.meta.last_row_id, '').run();
@@ -137,8 +137,8 @@ export async function executeFunction(env, name, args) {
         const existGuest = await env.DB.prepare('SELECT id FROM guests WHERE name=? AND active=1').bind(name).first();
         const existMember = await env.DB.prepare('SELECT id FROM members WHERE name=? AND active=1').bind(name).first();
         if (existGuest || existMember) { skipped++; continue; }
-        const result = await env.DB.prepare('INSERT INTO guests (name, professional, tel, invited_by, meeting_id) VALUES (?,?,?,?,?)')
-          .bind(name, g.professional || '', g.tel || '', g.invited_by || '', mid).run();
+        const result = await env.DB.prepare('INSERT INTO guests (name, professional, tel, invited_by, meeting_id, vip) VALUES (?,?,?,?,?,?)')
+          .bind(name, g.professional || '', g.tel || '', g.invited_by || '', mid, g.vip ? 1 : 0).run();
         const guestId = result.meta.last_row_id;
         // Create attendance record with payment status if meeting_id is set
         if (mid) {
@@ -171,6 +171,13 @@ export async function executeFunction(env, name, args) {
       return JSON.stringify({ ok: true, message: '已更新枱號為 ' + (args.table_number || '（清除）') });
     }
     case 'mark_arrival': {
+      // 未付款不能簽到
+      if (args.arrival_time && args.arrival_time !== 'absent') {
+        const row = await env.DB.prepare('SELECT payment FROM attendance WHERE id=?').bind(args.attendance_id).first();
+        if (!row || (row.payment !== 'paid' && row.payment !== 'free')) {
+          return JSON.stringify({ ok: false, message: '未付款不能簽到，請先更新付款狀態' });
+        }
+      }
       await env.DB.prepare('UPDATE attendance SET arrival_time=? WHERE id=?')
         .bind(args.arrival_time || 'absent', args.attendance_id).run();
       return JSON.stringify({ ok: true, message: '已標記為 ' + (args.arrival_time || 'absent') });

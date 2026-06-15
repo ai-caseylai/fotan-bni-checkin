@@ -27,6 +27,14 @@ export async function onRequest(context) {
       const body = await request.json();
       const { id, substitute, payment, payment_method, arrival_time, remark, table_number, price_tier } = body;
       if (!id) return Response.json({ error: 'ID required' }, { status: 400, headers: cors });
+      // 未付款不能簽到：如設定 arrival_time 且非 absent，必須已付費或免費
+      if (arrival_time && arrival_time !== 'absent') {
+        const row = await env.DB.prepare('SELECT payment FROM attendance WHERE id=?').bind(id).first();
+        const effectivePayment = payment || (row ? row.payment : '');
+        if (effectivePayment !== 'paid' && effectivePayment !== 'free') {
+          return Response.json({ error: '未付款不能簽到，請先完成付款' }, { status: 400, headers: cors });
+        }
+      }
       await env.DB.prepare(
         'UPDATE attendance SET substitute=?, payment=?, payment_method=?, arrival_time=?, remark=?, table_number=?, price_tier=? WHERE id=?'
       ).bind(substitute || '', payment || '', payment_method || '', arrival_time || '', remark || '', table_number || '', price_tier || '', id).run();
@@ -35,6 +43,10 @@ export async function onRequest(context) {
     if (request.method === 'POST') {
       const body = await request.json();
       const { meeting_id, person_type, person_id, substitute, payment, payment_method, arrival_time, remark } = body;
+      // 未付款不能簽到
+      if (arrival_time && arrival_time !== 'absent' && payment !== 'paid' && payment !== 'free') {
+        return Response.json({ error: '未付款不能簽到，請先完成付款' }, { status: 400, headers: cors });
+      }
       const result = await env.DB.prepare(
         'INSERT INTO attendance (meeting_id, person_type, person_id, substitute, payment, payment_method, arrival_time, remark) VALUES (?,?,?,?,?,?,?,?)'
       ).bind(meeting_id, person_type, person_id, substitute || '', payment || '', payment_method || '', arrival_time || '', remark || '').run();
