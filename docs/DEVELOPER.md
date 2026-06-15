@@ -29,7 +29,8 @@ fotan/
 ## 部署
 
 ```bash
-npx wrangler pages deploy . --project-name fotan --branch main --commit-dirty
+# 使用 wrangler v3（v4 有 Functions 遺失 bug）
+npx wrangler@3 pages deploy . --project-name fotan --branch main --commit-dirty
 ```
 
 ## Cloudflare 資源
