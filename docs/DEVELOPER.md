@@ -46,9 +46,11 @@ fotan/
 ├── skills/
 │   └── lobster-db.md           # 火炭會 Skill
 ├── docs/                       # 使用文件
-│   ├── USER_GUIDE.md           # 嘉賓使用手冊
-│   ├── ADMIN_GUIDE.md          # 後台管理手冊
-│   └── DEVELOPER.md            # 本檔案
+│   ├── USER_GUIDE.md           # 嘉賓使用手冊（含截圖）
+│   ├── ADMIN_GUIDE.md          # 後台管理手冊（含截圖）
+│   ├── DEVELOPER.md            # 開發文件
+│   ├── API.md                  # API 手冊
+│   └── REQUIREMENTS.md         # 需求書
 ├── chatbot_training.jsonl      # 300 條 Q&A 訓練數據
 ├── wrangler.toml               # Cloudflare 配置
 ├── _headers                    # 快取規則
@@ -170,19 +172,27 @@ CREATE TABLE skill_tokens (
 
 ## Skill REST API（/api/skill）
 
-Token 驗證後支援 9 種操作：
+Token 驗證後支援 **17 種操作**（100% GUI 對應）：
 
 | Action | 參數 | 說明 |
 |--------|------|------|
-| `import_guests` | `guests[]` | 批次匯入嘉賓，自動跳過重複 |
+| `import_guests` | `guests[]` | 批次匯入來賓 |
+| `bulk_create_members` | `members[]` | 批次匯入會員 |
+| `create_member` | `name`, tel, email, professional, role | 新增會員 |
+| `update_member` | `member_id`, +任意欄位 | 更新會員 |
+| `update_guest` | `guest_id`, +任意欄位 | 更新來賓 |
+| `delete_person` | `person_type`, `person_id` | 刪除人員 |
+| `search` | `q` | 搜尋會員+來賓 |
 | `update_payment` | `attendance_id`, `payment` | 更新付款狀態 |
 | `update_table` | `meeting_id`, `person_type`, `person_id`, `table_number` | 更新枱號 |
 | `mark_arrival` | `attendance_id`, `arrival_time` | 標記出席/缺席 |
-| `search` | `q` | 搜尋會員+來賓 |
+| `list_meetings` | — | 會議列表 |
 | `meeting_stats` | `meeting_id?` | 會議統計 |
 | `payment_summary` | `meeting_id?` | 付款摘要 |
-| `list_meetings` | — | 會議列表 |
 | `list_attendance` | `meeting_id?` | 出席名單 |
+| `get_settings` | — | 系統設定 |
+| `export_stats` | — | 綜合統計匯出 |
+| `upload_image` | `name`, `data`, `content_type` | 上傳圖片到 R2 |
 
 ## Chatbot 架構
 
@@ -196,8 +206,8 @@ chat.js → lib/chatbot.js
 telegram.js → lib/chatbot.js (同上)
 ```
 
-### Function Calling Tools
-`get_meetings`, `get_attendance`, `get_member_stats`, `search_people`, `get_member_detail`, `get_guest_list`, `get_payment_summary`, `get_industry_list`, `add_guest`, `bulk_add_guests`, `add_meeting`
+### Function Calling Tools（21 個，100% GUI 對應）
+`get_meetings`, `get_attendance`, `get_member_stats`, `search_people`, `get_member_detail`, `get_guest_list`, `get_payment_summary`, `get_industry_list`, `add_guest`, `bulk_add_guests`, `add_meeting`, `update_payment`, `update_table`, `mark_arrival`, `get_settings`, `delete_attendance`, `get_receipts`, `create_member`, `update_member`, `bulk_create_members`, `upload_image`
 
 ## 保安機制
 
