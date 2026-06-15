@@ -1,86 +1,69 @@
 ---
 name: fotan-skill
-description: 火炭會聚會簽到系統完整 Skill — 15 種 REST API 操作，100% GUI 對應
+description: 火炭會聚會簽到系統 v3.6 — 17 REST API + 多層收費 + 100% GUI 對應
 ---
 
-# 火炭會 Skill
+# 火炭會 Skill v3.6
 
-## Token 驗證 + 全部操作
+## Token 驗證
+```bash
+curl -s -X POST "https://fotan.techforliving.net/api/skill" \
+  -H "Content-Type: application/json" \
+  -d '{"token": "YOUR_TOKEN", "action": "list_meetings"}'
+```
 
-所有請求：`POST https://fotan.techforliving.net/api/skill` + JSON body，必須帶 `token` + `action`。
-
----
-
-## 🚀 全部 17 種操作一覽
-
-| # | Action | 用途 |
-|---|--------|------|
-| 1 | `import_guests` | 批次匯入來賓 |
-| 2 | `bulk_create_members` | 批次匯入會員 |
-| 3 | `create_member` | 新增單個會員 |
-| 4 | `update_member` | 更新會員資料 |
-| 5 | `update_guest` | 更新來賓資料 |
-| 6 | `delete_person` | 刪除人員 |
-| 7 | `search` | 搜尋會員+來賓 |
-| 8 | `update_payment` | 更新付款狀態 |
-| 9 | `update_table` | 更新枱號 |
-| 10 | `mark_arrival` | 標記出席/缺席 |
-| 11 | `list_meetings` | 會議列表 |
-| 12 | `meeting_stats` | 會議統計 |
-| 13 | `payment_summary` | 付款摘要 |
-| 14 | `list_attendance` | 出席名單 |
-| 15 | `get_settings` | 系統設定 |
-| 16 | `export_stats` | 綜合統計 |
-| 17 | `upload_image` | 上傳圖片到 R2 |
+所有操作：`POST /api/skill` + `{"token":"lob_xxxx","action":"...","...":"..."}`
 
 ---
 
 ## 👥 人員管理
 
-### 批次匯入會員 `bulk_create_members`
-```bash
-curl -s -X POST "https://fotan.techforliving.net/api/skill" \
-  -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"bulk_create_members","members":[{"name":"陳大文","tel":"12345678","email":"a@b.com","professional":"律師","role":"會員"}]}'
-```
-
-### 匯入嘉賓 `import_guests`
+### import_guests — 批次匯入來賓
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"import_guests","guests":[{"name":"陳大文","professional":"律師","payment":"paid"}]}'
 ```
-規則：自動用最新會議、跳過重複、會員會更新 attendance 付款狀態。
+自動跳過重複、自動用最新會議。
 
-### 新增會員 `create_member`
+### bulk_create_members — 批次匯入會員
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"create_member","name":"陳大文","tel":"12345678","email":"a@b.com","professional":"律師","role":"會員"}'
+  -d '{"token":"TOKEN","action":"bulk_create_members","members":[{"name":"陳大文","tel":"12345678","email":"a@b.com","professional":"律師"}]}'
 ```
 
-### 更新會員 `update_member`
+### create_member — 新增會員
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"update_member","member_id":1,"tel":"87654321","professional":"大律師"}'
+  -d '{"token":"TOKEN","action":"create_member","name":"陳大文","tel":"12345678","professional":"律師","role":"委員"}'
 ```
 
-### 更新來賓 `update_guest`
+### update_member — 更新會員
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"update_guest","guest_id":1,"professional":"會計師","invited_by":"Perry"}'
+  -d '{"token":"TOKEN","action":"update_member","member_id":1,"tel":"99999999"}'
 ```
+支援欄位：name, tel, email, professional, role, fee_paid_date, bio
 
-### 刪除人員 `delete_person`
+### update_guest — 更新來賓
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"delete_person","person_type":"guest","person_id":1}'
+  -d '{"token":"TOKEN","action":"update_guest","guest_id":15,"professional":"會計師"}'
+```
+支援欄位：name, professional, tel, invited_by, meeting_id
+
+### delete_person — 刪除人員
+```bash
+curl -s -X POST "https://fotan.techforliving.net/api/skill" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"TOKEN","action":"delete_person","person_type":"guest","person_id":15}'
 ```
 
-### 搜尋 `search`
+### search — 搜尋
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
@@ -91,56 +74,56 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
 
 ## 💰 付款與出席
 
-### 更新付款 `update_payment`
+### update_payment — 更新付款
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"update_payment","attendance_id":123,"payment":"paid"}'
+  -d '{"token":"TOKEN","action":"update_payment","attendance_id":152,"payment":"paid"}'
 ```
-`payment`: `paid` / `free` / `unpaid`
+payment: paid / free / unpaid。可選 price_tier: early_bird / walk_in
 
-### 更新枱號 `update_table`
+### update_table — 枱號
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"update_table","meeting_id":10,"person_type":"member","person_id":26,"table_number":"5"}'
+  -d '{"token":"TOKEN","action":"update_table","meeting_id":10,"person_type":"member","person_id":35,"table_number":"5"}'
 ```
 
-### 標記出席 `mark_arrival`
+### mark_arrival — 標記簽到
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"mark_arrival","attendance_id":123,"arrival_time":"12:30"}'
+  -d '{"token":"TOKEN","action":"mark_arrival","attendance_id":152,"arrival_time":"12:30"}'
 ```
-`arrival_time`: `HH:MM` 或 `absent`
+arrival_time: HH:MM 或 absent
 
 ---
 
 ## 📊 查詢
 
-### 會議列表 `list_meetings`
+### list_meetings
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"list_meetings"}'
 ```
 
-### 會議統計 `meeting_stats`
+### meeting_stats — 會議統計（含 revenue）
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"meeting_stats","meeting_id":10}'
+  -d '{"token":"TOKEN","action":"meeting_stats"}'
 ```
-回傳：total, members, guests, paid, free, unpaid, arrived, absent
+回傳：total, members, guests, paid, free, unpaid, arrived, absent, revenue + 全部 fee 欄位
 
-### 付款摘要 `payment_summary`
+### payment_summary
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"payment_summary"}'
 ```
 
-### 出席名單 `list_attendance`
+### list_attendance — 出席名單
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
@@ -148,41 +131,32 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
 ```
 回傳每人：id, name, person_type, payment, table_number, arrival_time, professional
 
-### 系統設定 `get_settings`
+### get_settings — 系統設定
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"get_settings"}'
 ```
 
-### 綜合統計 `export_stats`
+### export_stats — 綜合統計
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"export_stats"}'
 ```
-回傳：member_count, guest_count, 所有會議連統計
 
 ---
 
-## 🖼️ 圖片上傳
+## 🖼️ 圖片
 
-### 上傳圖片 `upload_image`
+### upload_image — 上傳圖片到 R2
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
-  -d '{"token":"TOKEN","action":"upload_image","name":"qr-alipay","data":"BASE64_DATA","content_type":"image/png"}'
+  -d '{"token":"TOKEN","action":"upload_image","name":"qr-alipay","data":"BASE64","content_type":"image/png"}'
 ```
-用途：上傳 QR Code、設定圖片到 R2。回傳 `/api/image?name=xxx` URL。
 
 ---
 
 ## 🛠️ 手動 SQL（需要 Wrangler）
-
-資料庫：D1 `fotan-db` (96baaebb-c825-4dcc-8229-e55abab0d474)
-```bash
-npx wrangler d1 execute fotan-db --remote --command "<SQL>"
-```
-
-### 資料表
-members, guests, meetings, attendance(payment: paid/free/unpaid), settings, member_receipts, telegram_messages, skill_tokens
+D1: `fotan-db` | `npx wrangler d1 execute fotan-db --remote --command "<SQL>"`
