@@ -5,5 +5,8 @@
   "description": "BNI Galaxy ST Meeting Attendance Tracker",
   "dependencies": {
     "puppeteer": "^25.1.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.100.0"
   }
 }
