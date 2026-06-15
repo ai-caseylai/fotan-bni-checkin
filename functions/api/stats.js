@@ -33,7 +33,7 @@ export async function onRequest(context) {
     const latest = meetings.results[0];
     if (latest) {
       const revRow = await env.DB.prepare(
-        `SELECT SUM(CASE WHEN a.payment IN ('paid','free') THEN
+        `SELECT SUM(CASE WHEN a.payment='paid' THEN
           CASE
             WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m.early_bird_fee,0), 388)
             WHEN a.price_tier='walk_in' THEN COALESCE(NULLIF(m.walk_in_fee,0), 388)
@@ -55,7 +55,8 @@ export async function onRequest(context) {
       member_attendance: allAttendance.filter(a => a.person_type === 'member').length,
       guest_attendance: allAttendance.filter(a => a.person_type === 'guest').length,
       observer_attendance: allAttendance.filter(a => a.person_type === 'observer').length,
-      paid_count: allAttendance.filter(a => a.payment && a.payment.toLowerCase() !== 'unpaid' && a.payment !== '').length,
+      paid_count: allAttendance.filter(a => a.payment === 'paid').length,
+      free_count: allAttendance.filter(a => a.payment === 'free').length,
       unpaid_count: allAttendance.filter(a => a.payment === '' || a.payment.toLowerCase() === 'unpaid').length,
       revenue: revenue,
       avg_arrival: '',

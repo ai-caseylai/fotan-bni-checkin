@@ -143,10 +143,11 @@ export async function onRequest(context) {
           SUM(CASE WHEN a.payment='unpaid' THEN 1 ELSE 0 END) as unpaid,
           SUM(CASE WHEN a.arrival_time IS NOT NULL AND a.arrival_time!='' AND a.arrival_time!='absent' THEN 1 ELSE 0 END) as arrived,
           SUM(CASE WHEN a.arrival_time='absent' THEN 1 ELSE 0 END) as absent,
-          SUM(CASE WHEN a.payment IN ('paid','free') THEN
+          SUM(CASE WHEN a.payment='paid' THEN
             CASE
               WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m.early_bird_fee,0), 388)
               WHEN a.price_tier='walk_in' THEN COALESCE(NULLIF(m.walk_in_fee,0), 388)
+              WHEN a.price_tier='committee' THEN COALESCE(NULLIF(m.committee_fee,0), 388)
               WHEN a.person_type='guest' THEN COALESCE(NULLIF(m.guest_fee,0), 388)
               WHEN a.person_type='member' THEN COALESCE(NULLIF(m.member_fee,0), 388)
               ELSE COALESCE(NULLIF(m.member_fee,0), 388)
