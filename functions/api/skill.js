@@ -81,11 +81,14 @@ export async function onRequest(context) {
 
     // ── update_payment ─────────────────────────────
     if (action === 'update_payment') {
-      const { attendance_id, payment } = body;
+      const { attendance_id, payment, price_tier } = body;
       if (!attendance_id) return Response.json({ ok: false, error: 'attendance_id required' }, { headers: cors });
       const validPayments = ['paid', 'free', 'unpaid', ''];
       if (!validPayments.includes(payment)) return Response.json({ ok: false, error: 'payment must be paid/free/unpaid' }, { headers: cors });
       await env.DB.prepare('UPDATE attendance SET payment=? WHERE id=?').bind(payment, attendance_id).run();
+      if (price_tier !== undefined) {
+        await env.DB.prepare('UPDATE attendance SET price_tier=? WHERE id=?').bind(price_tier, attendance_id).run();
+      }
       return Response.json({ ok: true, message: `已更新 attendance #${attendance_id} 付款為 ${payment || '未付款'}` }, { headers: cors });
     }
 
@@ -139,7 +142,16 @@ export async function onRequest(context) {
           SUM(CASE WHEN a.payment='free' THEN 1 ELSE 0 END) as free,
           SUM(CASE WHEN a.payment='unpaid' THEN 1 ELSE 0 END) as unpaid,
           SUM(CASE WHEN a.arrival_time IS NOT NULL AND a.arrival_time!='' AND a.arrival_time!='absent' THEN 1 ELSE 0 END) as arrived,
-          SUM(CASE WHEN a.arrival_time='absent' THEN 1 ELSE 0 END) as absent
+          SUM(CASE WHEN a.arrival_time='absent' THEN 1 ELSE 0 END) as absent,
+          SUM(CASE WHEN a.payment IN ('paid','free') THEN
+            CASE
+              WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m.early_bird_fee,0), 388)
+              WHEN a.price_tier='walk_in' THEN COALESCE(NULLIF(m.walk_in_fee,0), 388)
+              WHEN a.person_type='guest' THEN COALESCE(NULLIF(m.guest_fee,0), 388)
+              WHEN a.person_type='member' THEN COALESCE(NULLIF(m.member_fee,0), 388)
+              ELSE COALESCE(NULLIF(m.member_fee,0), 388)
+            END
+          ELSE 0 END) as revenue
         FROM meetings m LEFT JOIN attendance a ON m.id=a.meeting_id
         WHERE m.id=? GROUP BY m.id
       `).bind(mid).first();

@@ -12,7 +12,7 @@ export function getTools() {
     { type: 'function', function: { name: 'get_industry_list', description: '取得行業分類列表', parameters: { type: 'object', properties: {}, required: [] } } },
     { type: 'function', function: { name: 'add_guest', description: '新增來賓', parameters: { type: 'object', properties: { name: { type: 'string' }, professional: { type: 'string' }, tel: { type: 'string' }, invited_by: { type: 'string' }, meeting_id: { type: 'integer' } }, required: ['name'] } } },
     { type: 'function', function: { name: 'bulk_add_guests', description: '批次匯入來賓名單，支援姓名、專業、邀請人、付款狀態。當用戶提供名單或列表時使用。每筆會自動檢查重複並建立出席記錄。', parameters: { type: 'object', properties: { guests: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, professional: { type: 'string' }, tel: { type: 'string' }, invited_by: { type: 'string' }, payment: { type: 'string', description: 'paid/已付 或 unpaid/未付' } }, required: ['name'] } }, meeting_id: { type: 'integer', description: '會議ID，預設最新會議' } }, required: ['guests'] } } },
-    { type: 'function', function: { name: 'add_meeting', description: '新增會議', parameters: { type: 'object', properties: { date: { type: 'string' }, type: { type: 'string' }, collector: { type: 'string' }, guest_fee: { type: 'integer' } }, required: ['date', 'type'] } } },
+    { type: 'function', function: { name: 'add_meeting', description: '新增會議（可設定多層收費）', parameters: { type: 'object', properties: { date: { type: 'string' }, type: { type: 'string' }, collector: { type: 'string' }, guest_fee: { type: 'integer' }, member_fee: { type: 'integer' }, committee_fee: { type: 'integer' }, early_bird_fee: { type: 'integer' }, walk_in_fee: { type: 'integer' } }, required: ['date', 'type'] } } },
     { type: 'function', function: { name: 'update_payment', description: '更新出席記錄的付款狀態', parameters: { type: 'object', properties: { attendance_id: { type: 'integer' }, payment: { type: 'string', description: 'paid/free/unpaid' } }, required: ['attendance_id', 'payment'] } } },
     { type: 'function', function: { name: 'update_table', description: '設定枱號', parameters: { type: 'object', properties: { meeting_id: { type: 'integer' }, person_type: { type: 'string' }, person_id: { type: 'integer' }, table_number: { type: 'string' } }, required: ['meeting_id', 'person_type', 'person_id', 'table_number'] } } },
     { type: 'function', function: { name: 'mark_arrival', description: '標記簽到時間或缺席', parameters: { type: 'object', properties: { attendance_id: { type: 'integer' }, arrival_time: { type: 'string', description: 'HH:MM 或 absent' } }, required: ['attendance_id'] } } },
@@ -154,8 +154,8 @@ export async function executeFunction(env, name, args) {
     }
     case 'add_meeting': {
       if (!args.date || !args.type) return JSON.stringify({ error: '請提供日期和類型' });
-      await env.DB.prepare('INSERT INTO meetings (date, type, collector, guest_fee) VALUES (?,?,?,?)')
-        .bind(args.date, args.type, args.collector || '', args.guest_fee || 0).run();
+      await env.DB.prepare('INSERT INTO meetings (date, type, collector, guest_fee, member_fee, committee_fee, early_bird_fee, walk_in_fee) VALUES (?,?,?,?,?,?,?,?)')
+        .bind(args.date, args.type, args.collector || '', args.guest_fee || 0, args.member_fee || 0, args.committee_fee || 0, args.early_bird_fee || 0, args.walk_in_fee || 0).run();
       return JSON.stringify({ ok: true, message: '已新增會議：' + args.date });
     }
     case 'update_payment': {

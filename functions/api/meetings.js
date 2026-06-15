@@ -23,7 +23,23 @@ export async function onRequest(context) {
       // Add attendance stats for each meeting
       for (const m of rows.results) {
         const stats = await env.DB.prepare(
-          "SELECT COUNT(*) as total, SUM(CASE WHEN person_type='member' THEN 1 ELSE 0 END) as members, SUM(CASE WHEN person_type='guest' THEN 1 ELSE 0 END) as guests, SUM(CASE WHEN payment='paid' THEN 1 ELSE 0 END) as paid, SUM(CASE WHEN payment='free' THEN 1 ELSE 0 END) as free, SUM(CASE WHEN (payment='' OR payment='unpaid') AND arrival_time!='absent' THEN 1 ELSE 0 END) as unpaid FROM attendance WHERE meeting_id=?"
+          `SELECT COUNT(*) as total,
+            SUM(CASE WHEN person_type='member' THEN 1 ELSE 0 END) as members,
+            SUM(CASE WHEN person_type='guest' THEN 1 ELSE 0 END) as guests,
+            SUM(CASE WHEN payment='paid' THEN 1 ELSE 0 END) as paid,
+            SUM(CASE WHEN payment='free' THEN 1 ELSE 0 END) as free,
+            SUM(CASE WHEN (payment='' OR payment='unpaid') AND arrival_time!='absent' THEN 1 ELSE 0 END) as unpaid,
+            SUM(CASE WHEN payment IN ('paid','free') THEN
+              CASE
+                WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m2.early_bird_fee,0), 388)
+                WHEN a.price_tier='walk_in' THEN COALESCE(NULLIF(m2.walk_in_fee,0), 388)
+                WHEN a.price_tier='committee' THEN COALESCE(NULLIF(m2.committee_fee,0), 388)
+                WHEN a.person_type='guest' THEN COALESCE(NULLIF(m2.guest_fee,0), 388)
+                WHEN a.person_type='member' THEN COALESCE(NULLIF(m2.member_fee,0), 388)
+                ELSE COALESCE(NULLIF(m2.member_fee,0), 388)
+              END
+            ELSE 0 END) as revenue
+          FROM attendance a JOIN meetings m2 ON a.meeting_id=m2.id WHERE a.meeting_id=?`
         ).bind(m.id).first();
         m.stats = stats;
       }
@@ -31,11 +47,11 @@ export async function onRequest(context) {
     }
     if (request.method === 'POST') {
       const body = await request.json();
-      const { date, type, collector, guest_fee, table_number, attendance } = body;
+      const { date, type, collector, guest_fee, member_fee, committee_fee, early_bird_fee, walk_in_fee, table_number, attendance } = body;
       if (!date) return Response.json({ error: 'Date required' }, { status: 400, headers: cors });
 
-      const result = await env.DB.prepare('INSERT INTO meetings (date, type, collector, guest_fee, table_number) VALUES (?,?,?,?,?)')
-        .bind(date, type || 'regular', collector || '', guest_fee || 0, table_number || '').run();
+      const result = await env.DB.prepare('INSERT INTO meetings (date, type, collector, guest_fee, member_fee, committee_fee, early_bird_fee, walk_in_fee, table_number) VALUES (?,?,?,?,?,?,?,?,?)')
+        .bind(date, type || 'regular', collector || '', guest_fee || 0, member_fee || 0, committee_fee || 0, early_bird_fee || 0, walk_in_fee || 0, table_number || '').run();
       const meetingId = result.meta.last_row_id;
 
       if (attendance && Array.isArray(attendance)) {
@@ -52,7 +68,7 @@ export async function onRequest(context) {
       if (!id) return Response.json({ error: 'ID required' }, { status: 400, headers: cors });
       const body = await request.json();
       const sets = [], vals = [];
-      for (const k of ['date','type','collector','guest_fee','table_number']) {
+      for (const k of ['date','type','collector','guest_fee','member_fee','committee_fee','early_bird_fee','walk_in_fee','table_number']) {
         if (body[k] !== undefined) { sets.push(k+'=?'); vals.push(body[k]); }
       }
       if (!sets.length) return Response.json({ error: 'No fields' }, { status: 400, headers: cors });

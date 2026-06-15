@@ -28,6 +28,26 @@ export async function onRequest(context) {
 
     const memberCount = (await env.DB.prepare('SELECT COUNT(*) as c FROM members WHERE active=1').first()).c;
 
+    // Calculate revenue for latest meeting
+    let revenue = 0;
+    const latest = meetings.results[0];
+    if (latest) {
+      const revRow = await env.DB.prepare(
+        `SELECT SUM(CASE WHEN a.payment IN ('paid','free') THEN
+          CASE
+            WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m.early_bird_fee,0), 388)
+            WHEN a.price_tier='walk_in' THEN COALESCE(NULLIF(m.walk_in_fee,0), 388)
+            WHEN a.price_tier='committee' THEN COALESCE(NULLIF(m.committee_fee,0), 388)
+            WHEN a.person_type='guest' THEN COALESCE(NULLIF(m.guest_fee,0), 388)
+            WHEN a.person_type='member' THEN COALESCE(NULLIF(m.member_fee,0), 388)
+            ELSE COALESCE(NULLIF(m.member_fee,0), 388)
+          END
+        ELSE 0 END) as total
+        FROM attendance a JOIN meetings m ON a.meeting_id=m.id WHERE a.meeting_id=?`
+      ).bind(latest.id).first();
+      revenue = revRow?.total || 0;
+    }
+
     const stats = {
       total_meetings: totalMeetings,
       total_attendance: allAttendance.length,
@@ -37,6 +57,7 @@ export async function onRequest(context) {
       observer_attendance: allAttendance.filter(a => a.person_type === 'observer').length,
       paid_count: allAttendance.filter(a => a.payment && a.payment.toLowerCase() !== 'unpaid' && a.payment !== '').length,
       unpaid_count: allAttendance.filter(a => a.payment === '' || a.payment.toLowerCase() === 'unpaid').length,
+      revenue: revenue,
       avg_arrival: '',
       recent_meetings: meetings.results.slice(0, 10)
     };

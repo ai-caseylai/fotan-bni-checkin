@@ -243,9 +243,16 @@ function render(){
   var main=document.getElementById('main');
   if(locked&&last){
     var paid=last.payment&&last.payment!=='unpaid'&&last.payment!=='';
-    var fee=E(D.lunchFee),sched=E(D.schedule),chair=E(D.chairmanMsg);
+    var defaultFee = parseInt(D.lunchFee) || 388;
+    var displayFee = defaultFee;
+    if (last.tier === 'early_bird') displayFee = (meeting&&meeting.early_bird_fee) || defaultFee;
+    else if (last.tier === 'walk_in') displayFee = (meeting&&meeting.walk_in_fee) || defaultFee;
+    else if (last.type === 'guest') displayFee = (meeting&&meeting.guest_fee) || defaultFee;
+    else displayFee = (meeting&&meeting.member_fee) || defaultFee;
+    var fee=E(String(displayFee)),sched=E(D.schedule),chair=E(D.chairmanMsg);
+    var feeLabel = last.tier==='early_bird'?'早鳥價':(last.tier==='walk_in'?'臨場價':(last.type==='guest'?'來賓價':'會員價'));
     var h='<div class="result">';
-    h+='<div class="icon">'+paid?'✅':'📤'+'</div>';
+    h+='<div class="icon">'+(paid?'✅':'📤')+'</div>';
     h+='<div class="rname">'+E(last.name)+'</div>';
     h+='<div class="rtime">'+E(last.time)+'</div>';
     if(paid){
@@ -259,7 +266,7 @@ function render(){
       h+='</div>';
     }else{
       h+='<div class="pay-amount">';
-      h+='<div class="symbol">午餐費用</div>';
+      h+='<div class="symbol">午餐費用 · '+feeLabel+'</div>';
       h+='<div class="amt">HK$'+fee+'</div>';
       h+='<div class="note">請完成付款後上傳憑證</div>';
       h+='</div>';
@@ -336,7 +343,7 @@ function showConfirm(type,id,name,label){
   var isUnpaid=att&&(!att.payment||att.payment==='unpaid');
   if(isUnpaid){
     locked=true;
-    last={name:name,time:'',payment:'unpaid',attId:att.id};
+    last={name:name,time:'',payment:'unpaid',attId:att.id,type:type};
     render();
     return;
   }
@@ -375,10 +382,10 @@ function doCheckin(type,id,name){
     return Promise.reject(new Error('已簽到'));
   }
   if(exist){
-    return A('/attendance',{method:'PUT',body:JSON.stringify({id:exist.id,arrival_time:time})}).then(function(r){return{name:name,time:time,payment:exist.payment,attId:exist.id}});
+    return A('/attendance',{method:'PUT',body:JSON.stringify({id:exist.id,arrival_time:time})}).then(function(r){return{name:name,time:time,payment:exist.payment,attId:exist.id,type:type}});
   }
   // New attendance record
-  return A('/attendance',{method:'POST',body:JSON.stringify({meeting_id:meeting.id,person_type:type,person_id:id,arrival_time:time,payment:pay})}).then(function(r){return{name:name,time:time,payment:pay,attId:r.id}});
+  return A('/attendance',{method:'POST',body:JSON.stringify({meeting_id:meeting.id,person_type:type,person_id:id,arrival_time:time,payment:pay})}).then(function(r){return{name:name,time:time,payment:pay,attId:r.id,type:type}});
 }
 
 function showAlipayQR(fee){

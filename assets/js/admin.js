@@ -106,6 +106,7 @@ async function renderOverview(pc) {
       <div class="stat-card"><div class="n">${stats.member_count||0}</div><div class="l">會員人數</div></div>
       <div class="stat-card"><div class="n">${stats.total_attendance||0}</div><div class="l">總出席記錄</div></div>
       <div class="stat-card"><div class="n">${stats.paid_count||0}</div><div class="l">已付款次數</div></div>
+      <div class="stat-card"><div class="n" style="color:#10b981">$${(stats.revenue||0).toLocaleString()}</div><div class="l">💰 總收入</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="panel">
@@ -133,13 +134,13 @@ async function renderOverview(pc) {
       </div>
       <div class="panel-body">
         <table class="data-table">
-          <thead><tr><th></th><th>日期</th><th>類型</th><th>收款人</th><th>來賓費</th></tr></thead>
+          <thead><tr><th></th><th>日期</th><th>類型</th><th>收款人</th><th>收入</th></tr></thead>
           <tbody>${mts.slice(0,20).map(m => `<tr class="expand-tr" onclick="toggleOverviewMeeting(${m.id})">
             <td><span class="arrow">▶</span></td>
             <td><strong>${m.date}</strong></td>
             <td>${mLblText(m.type)}</td>
             <td>${esc(m.collector||'-')}</td>
-            <td>${m.guest_fee||0}</td>
+            <td style="color:#10b981;font-weight:600">$${(m.stats?.revenue||0).toLocaleString()}</td>
           </tr>
           <tr class="detail-row" id="ov-att-${m.id}"><td colspan="5"></td></tr>`).join('')}</tbody>
         </table>
@@ -311,19 +312,36 @@ async function showOverviewPayOps(type, pid, attId, name, paid) {
   var typeLabel = type==='member'?'會員':type==='guest'?'來賓':'';
   var isFree = paid === 'free';
   var payStatus = paid ? (isFree ? '🆓 免費' : '✅ 已付款') : '❌ 未付款';
-  // Load receipts — only show if they actually exist
-  var receiptImgs = '';
-  var imgTags = [];
-  // Checkin receipt (only if uploaded via receipt upload flow)
+
+  // Load attendance record for this person
+  var thisAtt = null;
   try {
     var attRecord = await api('/attendance?meeting_id='+(meetings[0]?.id||10));
-    var thisAtt = Array.isArray(attRecord) ? attRecord.find(function(a){return a.id===attId}) : null;
-    if (thisAtt && thisAtt.payment_method === 'receipt_uploaded') {
-      var checkinUrl = '/api/image?name=receipt-att-'+attId;
-      imgTags.push('<a href="'+checkinUrl+'" target="_blank"><img src="'+checkinUrl+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0"></a>');
-    }
+    thisAtt = Array.isArray(attRecord) ? attRecord.find(function(a){return a.id===attId}) : null;
   } catch(e) {}
-  // Member receipts from member_receipts table
+
+  // Determine price
+  var currentMeeting = meetings[0] || {};
+  var lunchFee = 388; // default
+  var priceLabel = '';
+  var tier = (thisAtt && thisAtt.price_tier) || '';
+  if (tier === 'early_bird') { priceLabel = '🐦 早鳥價'; }
+  else if (tier === 'walk_in') { priceLabel = '🚶 臨場價'; }
+  else if (type === 'guest') { priceLabel = '來賓價'; }
+  else { priceLabel = '會員價'; }
+  var displayFee = lunchFee;
+  if (tier === 'early_bird') displayFee = currentMeeting.early_bird_fee || lunchFee;
+  else if (tier === 'walk_in') displayFee = currentMeeting.walk_in_fee || lunchFee;
+  else if (type === 'guest') displayFee = currentMeeting.guest_fee || lunchFee;
+  else displayFee = currentMeeting.member_fee || lunchFee;
+
+  // Load receipts
+  var receiptImgs = '';
+  var imgTags = [];
+  if (thisAtt && thisAtt.payment_method === 'receipt_uploaded') {
+    var checkinUrl = '/api/image?name=receipt-att-'+attId;
+    imgTags.push('<a href="'+checkinUrl+'" target="_blank"><img src="'+checkinUrl+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0"></a>');
+  }
   if (type === 'member') {
     try {
       var receipts = await loadReceipts(pid);
@@ -335,10 +353,20 @@ async function showOverviewPayOps(type, pid, attId, name, paid) {
   if (imgTags.length > 0) {
     receiptImgs = '<div style="margin:8px 0"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">📄 已上傳憑證</div><div style="display:flex;gap:4px;flex-wrap:wrap">'+imgTags.join('')+'</div></div>';
   }
-  var paySection = '<div style="text-align:center;padding:8px 0"><span style="font-size:14px;font-weight:700;color:'+(isFree?'#3b82f6':(paid?'#10b981':'#f59e0b'))+'">'+payStatus+'</span></div>';
+
+  var tierLabel = tier==='early_bird'?'🐦 早鳥':(tier==='walk_in'?'🚶 臨場':'🏷️ 自動');
+  var paySection = '<div style="text-align:center;padding:8px 0"><span style="font-size:14px;font-weight:700;color:'+(isFree?'#3b82f6':(paid?'#10b981':'#f59e0b'))+'">'+payStatus+'</span><span style="font-size:11px;color:var(--text2);margin-left:8px">'+priceLabel+'</span></div>';
   paySection += receiptImgs;
+
+  // Price tier selector
+  paySection += '<div style="display:flex;gap:4px;margin-bottom:8px">';
+  paySection += '<button class="btn btn-sm '+(tier===''?'btn-primary':'btn-outline')+'" style="flex:1;font-size:10px" onclick="setPriceTier('+attId+',\'\')">🏷️ 自動</button>';
+  paySection += '<button class="btn btn-sm '+(tier==='early_bird'?'btn-primary':'btn-outline')+'" style="flex:1;font-size:10px" onclick="setPriceTier('+attId+',\'early_bird\')">🐦 早鳥</button>';
+  paySection += '<button class="btn btn-sm '+(tier==='walk_in'?'btn-primary':'btn-outline')+'" style="flex:1;font-size:10px" onclick="setPriceTier('+attId+',\'walk_in\')">🚶 臨場</button>';
+  paySection += '</div>';
+
   if (!paid) {
-    paySection += '<div style="text-align:center;font-size:24px;font-weight:800;margin-bottom:12px">HK$388</div>';
+    paySection += '<div style="text-align:center;font-size:24px;font-weight:800;margin-bottom:12px">HK$'+displayFee+' <span style="font-size:12px;color:var(--text2);font-weight:400">'+priceLabel+'</span></div>';
     // 1. 憑證付費
     paySection += '<div style="background:#f0fdf4;border:1.5px solid #10b981;border-radius:10px;padding:12px;margin-bottom:8px"><div style="font-weight:700;font-size:13px;color:#10b981;margin-bottom:8px">📤 憑證付費</div>';
     paySection += '<input type="file" id="ov-receipt" accept="image/*" style="width:100%;font-size:12px;margin-bottom:6px">';
@@ -367,6 +395,12 @@ async function deleteAttendee(attId) {
   toast('已刪除出席記錄');
   hideModal();
 }
+async function setPriceTier(attId, tier) {
+  await api('/attendance', {method:'PUT',body:JSON.stringify({id:attId,price_tier:tier})});
+  toast(tier==='early_bird'?'已設為早鳥價':(tier==='walk_in'?'已設為臨場價':'已設為自動'));
+  hideModal();
+}
+
 async function uploadOverviewReceipt(memberId, attId) {
   const file = document.getElementById('ov-receipt')?.files[0];
   if (!file) { toast('請選擇憑證圖片'); return; }
@@ -559,7 +593,13 @@ function showMeetingForm(editId) {
       <option value="anniversary" ${m.type==='anniversary'?'selected':''}>週年聚餐</option>
     </select>
     <label>收款人</label><input type="text" id="mt-collector" value="${esc(m.collector||'')}" placeholder="收款人名稱">
-    <label>來賓費</label><input type="number" id="mt-fee" value="${m.guest_fee||0}" placeholder="0">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><label>委員價</label><input type="number" id="mt-committee-fee" value="${m.committee_fee||''}" placeholder="388"></div>
+      <div><label>會員價</label><input type="number" id="mt-member-fee" value="${m.member_fee||''}" placeholder="388"></div>
+      <div><label>來賓價</label><input type="number" id="mt-guest-fee" value="${m.guest_fee||''}" placeholder="380"></div>
+      <div><label>早鳥價</label><input type="number" id="mt-early-fee" value="${m.early_bird_fee||''}" placeholder="350"></div>
+      <div><label>臨場價</label><input type="number" id="mt-walkin-fee" value="${m.walk_in_fee||''}" placeholder="420"></div>
+    </div>
     ${editId ? '' : '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="mt-add-members" checked style="width:18px;height:18px"> 複製上次會議的與會會員</label>'}
     <button class="btn btn-primary" style="width:100%" id="save-mt">${editId?'儲存':'新增會議'}</button>
   `);
@@ -568,7 +608,11 @@ function showMeetingForm(editId) {
       date: document.getElementById('mt-date').value,
       type: document.getElementById('mt-type').value,
       collector: document.getElementById('mt-collector').value,
-      guest_fee: parseInt(document.getElementById('mt-fee').value) || 0,
+      committee_fee: parseInt(document.getElementById('mt-committee-fee').value) || 0,
+      member_fee: parseInt(document.getElementById('mt-member-fee').value) || 0,
+      guest_fee: parseInt(document.getElementById('mt-guest-fee').value) || 0,
+      early_bird_fee: parseInt(document.getElementById('mt-early-fee').value) || 0,
+      walk_in_fee: parseInt(document.getElementById('mt-walkin-fee').value) || 0,
       table_number: ''
     };
     const addMembers = !editId && document.getElementById('mt-add-members')?.checked;
