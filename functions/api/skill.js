@@ -271,7 +271,45 @@ export async function onRequest(context) {
       }, { headers: cors });
     }
 
-    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, payment_summary, list_attendance, create_member, update_member, update_guest, delete_person, get_settings, export_stats` }, { headers: cors });
+    // ── bulk_create_members ─────────────────────────
+    if (action === 'bulk_create_members') {
+      const members = body.members;
+      if (!members || !Array.isArray(members) || !members.length) {
+        return Response.json({ ok: false, error: 'members array required' }, { headers: cors });
+      }
+      let added = 0, skipped = 0;
+      const results = [];
+      for (const m of members) {
+        const name = String(m.name || '').trim();
+        if (!name) continue;
+        const exist = await env.DB.prepare('SELECT id FROM members WHERE name=? AND active=1').bind(name).first();
+        if (exist) { skipped++; results.push({ name, status: 'skipped', reason: 'duplicate' }); continue; }
+        const result = await env.DB.prepare(
+          'INSERT INTO members (name, tel, email, professional, role, fee_paid_date) VALUES (?,?,?,?,?,?)'
+        ).bind(name, m.tel || '', m.email || '', m.professional || '', m.role || '會員', m.fee_paid_date || '').run();
+        added++;
+        results.push({ name, status: 'added', member_id: result.meta.last_row_id });
+      }
+      return Response.json({
+        ok: true, added, skipped,
+        message: `已新增 ${added} 位會員（跳過 ${skipped} 位重複）`,
+        results: results.slice(0, 50)
+      }, { headers: cors });
+    }
+
+    // ── upload_image ────────────────────────────────
+    if (action === 'upload_image') {
+      const { name, data, content_type } = body;
+      if (!name || !data) return Response.json({ ok: false, error: 'name and data required' }, { headers: cors });
+      const base64 = data.replace(/^data:image\/\w+;base64,/, '');
+      const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      await env.R2.put(name, bytes, {
+        httpMetadata: { contentType: content_type || 'image/png', cacheControl: 'public, max-age=86400' }
+      });
+      return Response.json({ ok: true, url: `/api/image?name=${encodeURIComponent(name)}`, message: '已上傳圖片：' + name }, { headers: cors });
+    }
+
+    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, payment_summary, list_attendance, create_member, update_member, update_guest, delete_person, get_settings, export_stats, bulk_create_members, upload_image` }, { headers: cors });
 
   } catch (e) {
     return Response.json({ ok: false, error: e.message }, { headers: cors });

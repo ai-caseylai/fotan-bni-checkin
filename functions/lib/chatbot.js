@@ -20,7 +20,9 @@ export function getTools() {
     { type: 'function', function: { name: 'delete_attendance', description: '刪除出席記錄', parameters: { type: 'object', properties: { attendance_id: { type: 'integer' } }, required: ['attendance_id'] } } },
     { type: 'function', function: { name: 'get_receipts', description: '查詢會員付款憑證', parameters: { type: 'object', properties: { member_id: { type: 'integer' } }, required: ['member_id'] } } },
     { type: 'function', function: { name: 'create_member', description: '新增會員', parameters: { type: 'object', properties: { name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' } }, required: ['name'] } } },
-    { type: 'function', function: { name: 'update_member', description: '更新會員資料', parameters: { type: 'object', properties: { member_id: { type: 'integer' }, name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' }, fee_paid_date: { type: 'string' }, bio: { type: 'string' } }, required: ['member_id'] } } }
+    { type: 'function', function: { name: 'update_member', description: '更新會員資料', parameters: { type: 'object', properties: { member_id: { type: 'integer' }, name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' }, fee_paid_date: { type: 'string' }, bio: { type: 'string' } }, required: ['member_id'] } } },
+    { type: 'function', function: { name: 'bulk_create_members', description: '批次匯入會員名單（Excel/CSV 匯入）', parameters: { type: 'object', properties: { members: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' }, fee_paid_date: { type: 'string' } }, required: ['name'] } } }, required: ['members'] } } },
+    { type: 'function', function: { name: 'upload_image', description: '上傳圖片到系統（QR Code、設定圖片等）', parameters: { type: 'object', properties: { name: { type: 'string', description: 'R2 檔名，如 qr-alipay' }, data: { type: 'string', description: 'Base64 圖片數據' }, content_type: { type: 'string', description: 'image/png 或 image/jpeg' } }, required: ['name', 'data'] } } }
   ];
 }
 
@@ -208,6 +210,31 @@ export async function executeFunction(env, name, args) {
       values.push(args.member_id);
       await env.DB.prepare('UPDATE members SET '+fields.join(',')+' WHERE id=?').bind(...values).run();
       return JSON.stringify({ ok: true, message: '已更新會員 #' + args.member_id });
+    }
+    case 'bulk_create_members': {
+      const memberList = args.members || [];
+      if (!memberList.length) return JSON.stringify({ error: '請提供會員名單' });
+      let added = 0, skipped = 0;
+      for (const m of memberList) {
+        const name = String(m.name || '').trim();
+        if (!name) continue;
+        const exist = await env.DB.prepare('SELECT id FROM members WHERE name=? AND active=1').bind(name).first();
+        if (exist) { skipped++; continue; }
+        await env.DB.prepare(
+          'INSERT INTO members (name, tel, email, professional, role, fee_paid_date) VALUES (?,?,?,?,?,?)'
+        ).bind(name, m.tel || '', m.email || '', m.professional || '', m.role || '會員', m.fee_paid_date || '').run();
+        added++;
+      }
+      return JSON.stringify({ ok: true, message: '已新增 ' + added + ' 位會員（跳過 ' + skipped + ' 位重複）', added, skipped });
+    }
+    case 'upload_image': {
+      if (!args.name || !args.data) return JSON.stringify({ error: '請提供 name 和 data' });
+      const base64 = args.data.replace(/^data:image\/\w+;base64,/, '');
+      const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      await env.R2.put(args.name, bytes, {
+        httpMetadata: { contentType: args.content_type || 'image/png', cacheControl: 'public, max-age=86400' }
+      });
+      return JSON.stringify({ ok: true, message: '已上傳圖片：' + args.name, url: '/api/image?name=' + encodeURIComponent(args.name) });
     }
     case 'get_meeting_participants':
     case 'get_participants':
