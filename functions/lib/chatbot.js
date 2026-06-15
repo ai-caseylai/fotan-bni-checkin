@@ -6,13 +6,21 @@ export function getTools() {
     { type: 'function', function: { name: 'get_attendance', description: '查詢指定會議出席狀況', parameters: { type: 'object', properties: { meeting_id: { type: 'integer' } }, required: ['meeting_id'] } } },
     { type: 'function', function: { name: 'get_member_stats', description: '取得會員統計數據', parameters: { type: 'object', properties: {}, required: [] } } },
     { type: 'function', function: { name: 'search_people', description: '搜尋會員或來賓', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } } },
-    { type: 'function', function: { name: 'get_member_detail', description: '查詢會員詳細資料', parameters: { type: 'object', properties: { member_id: { type: 'integer' } }, required: ['member_id'] } } },
+    { type: 'function', function: { name: 'get_member_detail', description: '查詢會員詳細資料，包含出席記錄', parameters: { type: 'object', properties: { member_id: { type: 'integer' } }, required: ['member_id'] } } },
     { type: 'function', function: { name: 'get_guest_list', description: '取得來賓列表', parameters: { type: 'object', properties: {}, required: [] } } },
     { type: 'function', function: { name: 'get_payment_summary', description: '查詢會議付款摘要', parameters: { type: 'object', properties: { meeting_id: { type: 'integer' } }, required: [] } } },
     { type: 'function', function: { name: 'get_industry_list', description: '取得行業分類列表', parameters: { type: 'object', properties: {}, required: [] } } },
     { type: 'function', function: { name: 'add_guest', description: '新增來賓', parameters: { type: 'object', properties: { name: { type: 'string' }, professional: { type: 'string' }, tel: { type: 'string' }, invited_by: { type: 'string' }, meeting_id: { type: 'integer' } }, required: ['name'] } } },
     { type: 'function', function: { name: 'bulk_add_guests', description: '批次匯入來賓名單，支援姓名、專業、邀請人、付款狀態。當用戶提供名單或列表時使用。每筆會自動檢查重複並建立出席記錄。', parameters: { type: 'object', properties: { guests: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, professional: { type: 'string' }, tel: { type: 'string' }, invited_by: { type: 'string' }, payment: { type: 'string', description: 'paid/已付 或 unpaid/未付' } }, required: ['name'] } }, meeting_id: { type: 'integer', description: '會議ID，預設最新會議' } }, required: ['guests'] } } },
-    { type: 'function', function: { name: 'add_meeting', description: '新增會議', parameters: { type: 'object', properties: { date: { type: 'string' }, type: { type: 'string' }, collector: { type: 'string' }, guest_fee: { type: 'integer' } }, required: ['date', 'type'] } } }
+    { type: 'function', function: { name: 'add_meeting', description: '新增會議', parameters: { type: 'object', properties: { date: { type: 'string' }, type: { type: 'string' }, collector: { type: 'string' }, guest_fee: { type: 'integer' } }, required: ['date', 'type'] } } },
+    { type: 'function', function: { name: 'update_payment', description: '更新出席記錄的付款狀態', parameters: { type: 'object', properties: { attendance_id: { type: 'integer' }, payment: { type: 'string', description: 'paid/free/unpaid' } }, required: ['attendance_id', 'payment'] } } },
+    { type: 'function', function: { name: 'update_table', description: '設定枱號', parameters: { type: 'object', properties: { meeting_id: { type: 'integer' }, person_type: { type: 'string' }, person_id: { type: 'integer' }, table_number: { type: 'string' } }, required: ['meeting_id', 'person_type', 'person_id', 'table_number'] } } },
+    { type: 'function', function: { name: 'mark_arrival', description: '標記簽到時間或缺席', parameters: { type: 'object', properties: { attendance_id: { type: 'integer' }, arrival_time: { type: 'string', description: 'HH:MM 或 absent' } }, required: ['attendance_id'] } } },
+    { type: 'function', function: { name: 'get_settings', description: '查詢系統設定', parameters: { type: 'object', properties: {}, required: [] } } },
+    { type: 'function', function: { name: 'delete_attendance', description: '刪除出席記錄', parameters: { type: 'object', properties: { attendance_id: { type: 'integer' } }, required: ['attendance_id'] } } },
+    { type: 'function', function: { name: 'get_receipts', description: '查詢會員付款憑證', parameters: { type: 'object', properties: { member_id: { type: 'integer' } }, required: ['member_id'] } } },
+    { type: 'function', function: { name: 'create_member', description: '新增會員', parameters: { type: 'object', properties: { name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' } }, required: ['name'] } } },
+    { type: 'function', function: { name: 'update_member', description: '更新會員資料', parameters: { type: 'object', properties: { member_id: { type: 'integer' }, name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' }, fee_paid_date: { type: 'string' }, bio: { type: 'string' } }, required: ['member_id'] } } }
   ];
 }
 
@@ -147,6 +155,59 @@ export async function executeFunction(env, name, args) {
       await env.DB.prepare('INSERT INTO meetings (date, type, collector, guest_fee) VALUES (?,?,?,?)')
         .bind(args.date, args.type, args.collector || '', args.guest_fee || 0).run();
       return JSON.stringify({ ok: true, message: '已新增會議：' + args.date });
+    }
+    case 'update_payment': {
+      const validPayments = ['paid', 'free', 'unpaid', ''];
+      if (!validPayments.includes(args.payment)) return JSON.stringify({ error: 'payment 必須為 paid/free/unpaid' });
+      await env.DB.prepare('UPDATE attendance SET payment=? WHERE id=?').bind(args.payment, args.attendance_id).run();
+      return JSON.stringify({ ok: true, message: '已更新付款狀態為 ' + args.payment });
+    }
+    case 'update_table': {
+      await env.DB.prepare(
+        'UPDATE attendance SET table_number=? WHERE meeting_id=? AND person_type=? AND person_id=?'
+      ).bind(args.table_number || '', args.meeting_id, args.person_type, args.person_id).run();
+      return JSON.stringify({ ok: true, message: '已更新枱號為 ' + (args.table_number || '（清除）') });
+    }
+    case 'mark_arrival': {
+      await env.DB.prepare('UPDATE attendance SET arrival_time=? WHERE id=?')
+        .bind(args.arrival_time || 'absent', args.attendance_id).run();
+      return JSON.stringify({ ok: true, message: '已標記為 ' + (args.arrival_time || 'absent') });
+    }
+    case 'get_settings': {
+      const rows = await env.DB.prepare('SELECT key, value FROM settings').all();
+      const settings = {};
+      rows.results.forEach(r => { settings[r.key] = r.value; });
+      return JSON.stringify({ ok: true, settings });
+    }
+    case 'delete_attendance': {
+      await env.DB.prepare('DELETE FROM attendance WHERE id=?').bind(args.attendance_id).run();
+      return JSON.stringify({ ok: true, message: '已刪除出席記錄 #' + args.attendance_id });
+    }
+    case 'get_receipts': {
+      const rows = await env.DB.prepare(
+        'SELECT id, filename, created_at FROM member_receipts WHERE member_id=? ORDER BY created_at DESC'
+      ).bind(args.member_id).all();
+      return JSON.stringify({ ok: true, receipts: rows.results, count: rows.results.length });
+    }
+    case 'create_member': {
+      if (!args.name) return JSON.stringify({ error: '請提供會員姓名' });
+      const exist = await env.DB.prepare('SELECT id FROM members WHERE name=? AND active=1').bind(args.name).first();
+      if (exist) return JSON.stringify({ error: '會員 ' + args.name + ' 已存在' });
+      const result = await env.DB.prepare(
+        'INSERT INTO members (name, tel, email, professional, role) VALUES (?,?,?,?,?)'
+      ).bind(args.name, args.tel || '', args.email || '', args.professional || '', args.role || '會員').run();
+      return JSON.stringify({ ok: true, message: '已新增會員：' + args.name, member_id: result.meta.last_row_id });
+    }
+    case 'update_member': {
+      const fields = [];
+      const values = [];
+      for (const f of ['name','tel','email','professional','role','fee_paid_date','bio']) {
+        if (args[f] !== undefined) { fields.push(f+'=?'); values.push(args[f]); }
+      }
+      if (!fields.length) return JSON.stringify({ error: '請提供要更新的欄位' });
+      values.push(args.member_id);
+      await env.DB.prepare('UPDATE members SET '+fields.join(',')+' WHERE id=?').bind(...values).run();
+      return JSON.stringify({ ok: true, message: '已更新會員 #' + args.member_id });
     }
     case 'get_meeting_participants':
     case 'get_participants':

@@ -1909,10 +1909,15 @@ async function renderSkillPage(pc) {
   pc.innerHTML = `
     <h2 style="font-size:20px;font-weight:700;margin-bottom:16px">🦞 火炭會 Skill</h2>
     <div class="panel">
-      <div class="panel-header"><h2>📥 下載 Skill 檔案</h2></div>
-      <div class="panel-body" style="padding:16px;text-align:center">
-        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">將此 Skill 檔案放到 OpenClaw / Claude Code 的 skills 目錄即可使用</p>
-        <button class="btn btn-primary" onclick="downloadSkill()">📥 下載 火炭會 Skill</button>
+      <div class="panel-header"><h2>📥 下載文件</h2></div>
+      <div class="panel-body" style="padding:16px;text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="downloadSkill()">🦞 下載 Skill 檔</button>
+        <button class="btn btn-outline" onclick="downloadAPIManual()">📋 下載 API 手冊</button>
+        <button class="btn btn-outline" onclick="window.open('/docs/USER_GUIDE.md')">📖 使用手冊</button>
+      </div>
+      <div style="padding:0 16px 16px;font-size:11px;color:var(--text2);text-align:center">
+        Skill 檔放 OpenClaw / Claude Code skills 目錄即可使用
+      </div>
       </div>
     </div>
     <div class="panel" style="margin-top:16px">
@@ -1989,6 +1994,37 @@ function downloadSkill() {
   a.download = 'fotan-skill.md';
   a.click();
   toast('Skill 已下載');
+}
+
+function downloadAPIManual() {
+  var content = '# API 手冊 — 火炭會聚會簽到系統\n\n'+
+    '## Skill REST API（Token 保護）\n\n端點：`POST https://fotan.techforliving.net/api/skill`\n\n'+
+    '| Action | 參數 | 說明 |\n|--------|------|------|\n'+
+    '| import_guests | guests[] | 批次匯入來賓 |\n'+
+    '| create_member | name, tel, email, professional, role | 新增會員 |\n'+
+    '| update_member | member_id, +欄位 | 更新會員 |\n'+
+    '| update_guest | guest_id, +欄位 | 更新來賓 |\n'+
+    '| delete_person | person_type, person_id | 刪除人員 |\n'+
+    '| search | q | 搜尋會員+來賓 |\n'+
+    '| update_payment | attendance_id, payment | 更新付款 |\n'+
+    '| update_table | meeting_id, person_type, person_id, table_number | 更新枱號 |\n'+
+    '| mark_arrival | attendance_id, arrival_time | 標記出席 |\n'+
+    '| list_meetings | — | 會議列表 |\n'+
+    '| meeting_stats | meeting_id? | 會議統計 |\n'+
+    '| payment_summary | meeting_id? | 付款摘要 |\n'+
+    '| list_attendance | meeting_id? | 出席名單 |\n'+
+    '| get_settings | — | 系統設定 |\n'+
+    '| export_stats | — | 綜合統計 |\n\n'+
+    '## 後台 API（Cookie 驗證）\n\n'+
+    '全部在 /api/ 路徑：members, guests, meetings, attendance, auth, chat, telegram, skill-tokens, skill, settings, stats, receipts, checkin-upload, backup, image\n\n'+
+    '## Chatbot Tools（19 個）\n'+
+    'get_meetings, get_attendance, get_member_stats, search_people, get_member_detail, get_guest_list, get_payment_summary, get_industry_list, add_guest, bulk_add_guests, add_meeting, update_payment, update_table, mark_arrival, get_settings, delete_attendance, get_receipts, create_member, update_member\n';
+  var blob = new Blob([content], { type: 'text/markdown' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fotan-api-manual.md';
+  a.click();
+  toast('API 手冊已下載');
 }
 
 // ── Telegram Log Viewer ──────────────────────────

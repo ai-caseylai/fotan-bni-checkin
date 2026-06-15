@@ -191,7 +191,87 @@ export async function onRequest(context) {
       return Response.json({ ok: true, meeting_id: mid, attendance: rows.results }, { headers: cors });
     }
 
-    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, payment_summary, list_attendance` }, { headers: cors });
+    // ── create_member ───────────────────────────────
+    if (action === 'create_member') {
+      const { name, tel, email, professional, role } = body;
+      if (!name) return Response.json({ ok: false, error: 'name required' }, { headers: cors });
+      const exist = await env.DB.prepare('SELECT id FROM members WHERE name=? AND active=1').bind(name).first();
+      if (exist) return Response.json({ ok: false, error: 'member already exists' }, { headers: cors });
+      const result = await env.DB.prepare(
+        'INSERT INTO members (name, tel, email, professional, role) VALUES (?,?,?,?,?)'
+      ).bind(name, tel || '', email || '', professional || '', role || '會員').run();
+      return Response.json({ ok: true, member_id: result.meta.last_row_id, message: '已新增會員：' + name }, { headers: cors });
+    }
+
+    // ── update_member ───────────────────────────────
+    if (action === 'update_member') {
+      const { member_id, name, tel, email, professional, role, fee_paid_date, bio } = body;
+      if (!member_id) return Response.json({ ok: false, error: 'member_id required' }, { headers: cors });
+      const fields = [];
+      const values = [];
+      for (const f of ['name','tel','email','professional','role','fee_paid_date','bio']) {
+        const v = body[f];
+        if (v !== undefined) { fields.push(f+'=?'); values.push(v); }
+      }
+      if (!fields.length) return Response.json({ ok: false, error: 'no fields to update' }, { headers: cors });
+      values.push(member_id);
+      await env.DB.prepare('UPDATE members SET '+fields.join(',')+' WHERE id=?').bind(...values).run();
+      return Response.json({ ok: true, message: '已更新會員 #' + member_id }, { headers: cors });
+    }
+
+    // ── update_guest ────────────────────────────────
+    if (action === 'update_guest') {
+      const { guest_id, name, professional, tel, invited_by, meeting_id } = body;
+      if (!guest_id) return Response.json({ ok: false, error: 'guest_id required' }, { headers: cors });
+      const fields = [];
+      const values = [];
+      for (const f of ['name','professional','tel','invited_by','meeting_id']) {
+        const v = body[f];
+        if (v !== undefined) { fields.push(f+'=?'); values.push(v); }
+      }
+      if (!fields.length) return Response.json({ ok: false, error: 'no fields to update' }, { headers: cors });
+      values.push(guest_id);
+      await env.DB.prepare('UPDATE guests SET '+fields.join(',')+' WHERE id=?').bind(...values).run();
+      return Response.json({ ok: true, message: '已更新來賓 #' + guest_id }, { headers: cors });
+    }
+
+    // ── delete_person ───────────────────────────────
+    if (action === 'delete_person') {
+      const { person_type, person_id } = body;
+      if (!person_type || !person_id) return Response.json({ ok: false, error: 'person_type and person_id required' }, { headers: cors });
+      if (person_type === 'member') {
+        await env.DB.prepare('UPDATE members SET active=0 WHERE id=?').bind(person_id).run();
+      } else {
+        await env.DB.prepare('UPDATE guests SET active=0 WHERE id=?').bind(person_id).run();
+        await env.DB.prepare('DELETE FROM attendance WHERE person_type=? AND person_id=?').bind(person_type, person_id).run();
+      }
+      return Response.json({ ok: true, message: '已刪除 ' + person_type + ' #' + person_id }, { headers: cors });
+    }
+
+    // ── get_settings ────────────────────────────────
+    if (action === 'get_settings') {
+      const rows = await env.DB.prepare('SELECT key, value FROM settings').all();
+      const settings = {};
+      rows.results.forEach(r => { settings[r.key] = r.value; });
+      return Response.json({ ok: true, settings }, { headers: cors });
+    }
+
+    // ── export_stats ────────────────────────────────
+    if (action === 'export_stats') {
+      const meetings = await env.DB.prepare(
+        'SELECT m.*, COUNT(a.id) as total, SUM(CASE WHEN a.person_type=\'member\' THEN 1 ELSE 0 END) as members, SUM(CASE WHEN a.person_type=\'guest\' THEN 1 ELSE 0 END) as guests, SUM(CASE WHEN a.payment=\'paid\' THEN 1 ELSE 0 END) as paid, SUM(CASE WHEN a.payment=\'free\' THEN 1 ELSE 0 END) as free, SUM(CASE WHEN a.payment=\'unpaid\' THEN 1 ELSE 0 END) as unpaid, SUM(CASE WHEN a.arrival_time IS NOT NULL AND a.arrival_time!=\'\' AND a.arrival_time!=\'absent\' THEN 1 ELSE 0 END) as arrived, SUM(CASE WHEN a.arrival_time=\'absent\' THEN 1 ELSE 0 END) as absent FROM meetings m LEFT JOIN attendance a ON m.id=a.meeting_id GROUP BY m.id ORDER BY m.date DESC'
+      ).all();
+      const memberCount = await env.DB.prepare('SELECT COUNT(*) as c FROM members WHERE active=1').first();
+      const guestCount = await env.DB.prepare('SELECT COUNT(*) as c FROM guests WHERE active=1').first();
+      return Response.json({
+        ok: true,
+        member_count: memberCount.c,
+        guest_count: guestCount.c,
+        meetings: meetings.results
+      }, { headers: cors });
+    }
+
+    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, payment_summary, list_attendance, create_member, update_member, update_guest, delete_person, get_settings, export_stats` }, { headers: cors });
 
   } catch (e) {
     return Response.json({ ok: false, error: e.message }, { headers: cors });
