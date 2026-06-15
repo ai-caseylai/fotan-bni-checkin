@@ -90,6 +90,7 @@ async function loadPage(page) {
     case 'checkin': await renderCheckinOp(pc); break;
     case 'settings': await renderSettingsPage(pc); break;
     case 'qatraining': await renderQATraining(pc); break;
+    case 'docs': renderDocsPage(pc); break;
     case 'skill': await renderSkillPage(pc); break;
   }
 }
@@ -1902,6 +1903,11 @@ function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ── Docs Page ────────────────────────────────────
+function renderDocsPage(pc) {
+  pc.innerHTML = '<iframe src="/docs/" style="width:100%;height:calc(100vh - 100px);border:none;border-radius:8px"></iframe>';
 }
 
 // ── Skill Page ────────────────────────────────────
