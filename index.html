@@ -18,15 +18,16 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#e2e8f0;color:var(--text);-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
-#app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:var(--bg)}
+#app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:#fff}
 #top{background:var(--pri);color:#fff;text-align:center;padding:14px 20px;padding-top:calc(14px + env(safe-area-inset-top,0));flex-shrink:0}
 #top h1{font-size:17px;font-weight:700;letter-spacing:-.2px}
 #top .sub{font-size:11px;opacity:.85;margin-top:2px;font-weight:500}
 #main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0}
-#bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0));background:var(--pri);color:#fff;flex-shrink:0;gap:8px;font-size:12px}
-#bar span{flex:1;font-weight:500}
-#bar button{padding:6px 14px;border-radius:20px;border:1.5px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s}
-#bar button:active{background:rgba(255,255,255,.25)}
+#bar{display:flex;align-items:stretch;justify-content:center;padding:0;padding-bottom:env(safe-area-inset-bottom,0);background:rgba(255,255,255,.95);color:var(--text);flex-shrink:0;border-top:1px solid rgba(0,0,0,.08)}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px 8px;cursor:pointer;transition:all .15s;border:none;background:none;color:var(--text3);font-size:10px;font-weight:500;-webkit-tap-highlight-color:transparent;outline:none}
+.tab-item .tab-icon{font-size:20px;line-height:1}
+.tab-item.active{color:var(--pri)}
+.tab-item:active{opacity:.7}
 
 .hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--border)}
 .hdr .cnt{background:var(--pri);color:#fff;font-size:10px;padding:2px 10px;border-radius:10px;font-weight:600}
@@ -38,6 +39,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 .info{flex:1;min-width:0}
 .info .n{font-weight:600;font-size:15px;color:var(--text)}
 .info .m{font-size:12px;color:var(--text2);margin-top:1px}
+.row .tbl{font-size:13px;font-weight:700;color:var(--pri);background:var(--pri-light);padding:4px 10px;border-radius:12px;flex-shrink:0;margin-left:auto}
 
 .loading{text-align:center;padding:80px 20px;color:var(--text3)}
 .nomeet{text-align:center;padding:80px 20px;color:var(--text3)}
@@ -85,9 +87,9 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 </head>
 <body>
 <div id="app">
-<div id="top"><h1>火炭會聚會 <span style="font-size:10px;opacity:.5">v2.0</span></h1><div id="sub"></div></div>
+<div id="top"><h1>火炭會聚會 <span style="font-size:10px;opacity:.5">v3.0</span></h1><div id="sub"></div></div>
 <div id="main"></div>
-<div id="bar"><span id="bar-msg"></span><button onclick="location.reload()">🔄</button></div>
+<div id="bar"><button id="bar-unchecked" class="tab-item active" onclick="switchTab('unchecked')"><span class="tab-icon">👥</span><span>未簽到</span></button><button id="bar-checked" class="tab-item" onclick="switchTab('checked')"><span class="tab-icon">✅</span><span>已簽到</span></button><button class="tab-item" onclick="showSchedule()"><span class="tab-icon">📋</span><span>流程</span></button><button class="tab-item" onclick="showProductIntro()"><span class="tab-icon">🏅</span><span>委員</span></button><button class="tab-item" onclick="showAboutUs()"><span class="tab-icon">ℹ️</span><span>關於</span></button></div>
 </div>
 <script>
 var API='/api';
@@ -96,7 +98,7 @@ var meeting=null,members=[],guests=[],observers=[],checked=[],locked=false,last=
 var D={
   lunchFee:'388',paymeLink:'https://payme.hsbc/fotan',
   wcLink:'https://pay.weixin.qq.com/',aliLink:'https://www.alipayhk.com/',fpsPhone:'97188675',aliQrImg:'',fpsQrImg:'',
-  tableNumber:'8',
+  tableNumber:'8',productIntro:'',aboutUs:'',joinLink:'',
   schedule:'12:30 報到及交流\n12:45 例會正式開始\n13:00 會員介紹 (30秒每位)\n13:20 專題分享\n13:40 來賓介紹\n14:00 商業引薦\n14:30 午宴及自由交流\n15:00 活動結束',
   chairmanMsg:'感謝您今天蒞臨火炭會聚會！\n期待每個月也可以見面！'
 };
@@ -118,7 +120,6 @@ function init(){
     if(!meeting){
       document.getElementById('sub').textContent='簽到';
       main.innerHTML='<div class="nomeet"><h3>暫無即將舉行的聚會</h3><p style="margin-top:4px;font-size:13px">請到後台建立</p></div>';
-      document.getElementById('bar-msg').textContent='無會議';
       return;
     }
     var prefix=meeting.date===today?'📅 ':'📅 [即將舉行] ';
@@ -131,12 +132,111 @@ function init(){
   });
 }
 
+var tabFilter='unchecked';
+function switchTab(tab){
+  tabFilter=tab;
+  document.querySelectorAll('.tab-item').forEach(function(b){b.classList.toggle('active',b.id==='bar-'+tab)});
+  render();
+}
+
+function showSchedule(){
+  var sched=D.schedule||'暫無節目表';
+  showInfoModal('📋 時間表', sched.replace(/\n/g,'<br>'));
+}
+
+function showChairmanMsg(){
+  var msg=D.chairmanMsg||'暫無主席的話';
+  showInfoModal('💬 主席的話', msg.replace(/\n/g,'<br>'));
+}
+
+function showProductIntro(){
+  var msg=D.productIntro||'暫無委員介紹';
+  showInfoModal('🏅 委員介紹', msg.replace(/\n/g,'<br>'));
+}
+
+function playBeep(freq, dur, type){
+  try {
+    var ctx = new (window.AudioContext||window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq || 800;
+    gain.gain.value = 0.3;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (dur||0.2));
+    osc.stop(ctx.currentTime + (dur||0.2));
+  } catch(e) {}
+}
+
+function playSuccess(){
+  playBeep(880, 0.15, 'sine');
+  setTimeout(function(){ playBeep(1100, 0.2, 'sine'); }, 100);
+}
+
+function showAboutUs(){
+  var msg=(D.aboutUs||'暫無火炭會介紹').replace(/\n/g,'<br>');
+  if(D.joinLink) msg+='<br><br><a href="'+E(D.joinLink)+'" target="_blank" style="color:var(--pri);font-weight:700;text-decoration:none;font-size:16px">✍️ 申請入會 →</a>';
+  showInfoModal('ℹ️ 火炭會介紹', msg);
+}
+
+function showInfoModal(title, body){
+  var ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML='<div class="dbox" style="max-width:360px;max-height:80vh;overflow-y:auto;text-align:left"><div class="dn">'+title+'</div><div style="font-size:14px;color:var(--text);line-height:1.8">'+body+'</div><button class="btn-yes" style="width:100%;margin-top:16px;padding:12px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer" onclick="this.closest(\'.overlay\').remove()">關閉</button></div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove()});
+  document.body.appendChild(ov);
+}
+
+function showPersonCard(type, pid){
+  var list=type==='member'?members:type==='guest'?guests:observers;
+  var p=list.find(function(x){return x.id===pid});
+  if(!p) return;
+  var name=E(p.name);
+  var tel=E(p.tel||'');
+  var prof=E(p.professional||'');
+  var email=E(p.email||'');
+  var role=E(p.role||'');
+  var att = checked.find(function(a){return a.person_type===type&&a.person_id===pid});
+  var tbl=E((att&&att.table_number)?att.table_number:(p.table_number||''));
+  var label=type==='member'?'會員':type==='guest'?'來賓':'觀察員';
+
+  var body='<div style="text-align:center;margin-bottom:12px"><div class="av '+type+'" style="width:56px;height:56px;font-size:22px;margin:0 auto 8px">'+name.charAt(0)+'</div><div style="font-size:20px;font-weight:700">'+name+'</div><div style="font-size:13px;color:var(--text2)">'+label+'</div></div>';
+  if(tbl) body+='<div style="text-align:center;margin-bottom:8px"><span style="background:var(--pri-light);color:var(--pri);padding:4px 14px;border-radius:12px;font-weight:700;font-size:14px">🍽 '+tbl+'號枱</span></div>';
+  if(role&&role!=='會員') body+='<div style="padding:8px 0;font-size:15px">🏅 '+role+'</div>';
+  if(prof) body+='<div style="padding:8px 0;font-size:15px">💼 '+prof+'</div>';
+  var bio=E(p.bio||'');
+  if(bio) body+='<div style="padding:10px 12px;margin:8px 0;background:var(--bg);border-radius:10px;font-size:13px;line-height:1.6;white-space:pre-line">📝 '+bio+'</div>';
+  if(tel) body+='<div style="padding:8px 0;font-size:15px">📱 <a href="tel:+852'+tel.replace(/[^0-9]/g,'')+'" style="color:var(--pri);text-decoration:none;font-weight:600">'+tel+'</a></div>';
+  if(email) body+='<div style="padding:8px 0;font-size:15px">📧 '+email+'</div>';
+
+  if(tel){
+    body+='<a href="'+vcfLink(p)+'" download="'+name+'.vcf" style="display:block;text-align:center;margin-top:12px;padding:12px;background:var(--pri-light);color:var(--pri);border-radius:10px;text-decoration:none;font-weight:700;font-size:14px">📇 加入通訊錄 (vCard)</a>';
+  }
+
+  var ov=document.createElement('div');ov.className='overlay';
+  ov.innerHTML='<div class="dbox" style="max-width:340px"><div class="dn" style="font-size:11px;color:var(--text2)">'+label+'資料</div>'+body+'<button class="btn-yes" style="width:100%;margin-top:12px;padding:12px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer" onclick="this.closest(\'.overlay\').remove()">關閉</button></div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove()});
+  document.body.appendChild(ov);
+}
+
+function vcfLink(p){
+  var name=E(p.name||'');
+  var tel=(p.tel||'').replace(/[^0-9]/g,'');
+  var vcf='BEGIN:VCARD\nVERSION:3.0\nFN:'+name+'\nTEL;TYPE=CELL:+852'+tel+'\n';
+  if(p.professional) vcf+='TITLE:'+E(p.professional)+'\n';
+  if(p.email) vcf+='EMAIL:'+E(p.email)+'\n';
+  vcf+='END:VCARD';
+  return 'data:text/vcard;charset=utf-8,'+encodeURIComponent(vcf);
+}
+
 function allPeople(){
   var map={};checked.forEach(function(a){map[a.person_type+'_'+a.person_id]=a});
   var all=[];
   members.forEach(function(p){all.push({p:p,type:'member',label:'會員',att:map['member_'+p.id]||null})});
   guests.forEach(function(p){all.push({p:p,type:'guest',label:'來賓',att:map['guest_'+p.id]||null})});
   observers.forEach(function(p){all.push({p:p,type:'observer',label:'觀察員',att:map['observer_'+p.id]||null})});
+  all.sort(function(a,b){return (a.p.name||'').localeCompare(b.p.name||'')});
   return all;
 }
 
@@ -154,7 +254,7 @@ function render(){
       h+='<div style="font-size:48px;margin-bottom:16px">✅</div>';
       h+='<div style="font-size:14px;font-weight:700;color:var(--success);margin-bottom:4px">簽到確認</div>';
       h+='<div style="font-size:20px;font-weight:700;margin-bottom:4px">多謝光臨</div>';
-      h+='<div style="font-size:14px;color:var(--text2);margin-bottom:20px">🍽 '+E(D.tableNumber)+' 號枱</div>';
+      h+='<div style="font-size:14px;color:var(--text2);margin-bottom:20px">🍽 '+(meeting&&meeting.table_number?E(meeting.table_number):E(D.tableNumber))+' 號枱</div>';
       if(D.schedule)h+='<div class="card2"><h3>節目表</h3><div class="sched">'+sched+'</div></div>';
       if(D.chairmanMsg)h+='<div class="msg2">'+chair+'</div>';
       h+='</div>';
@@ -185,28 +285,43 @@ if(D.aliLink)h+='<a href="javascript:void(0)" onclick="showAlipayQR('+fee+')" st
     }
     h+='</div>';
     main.innerHTML=h;
-    document.getElementById('bar-msg').textContent='已簽到 ✓';
     return;
   }
 
   var all=allPeople().filter(function(x){return !x.att||(!x.att.arrival_time&&x.att.arrival_time!=='absent');});
   var done=allPeople().filter(function(x){return !!x.att;});
   var total=all.length+done.length;
-  document.getElementById('bar-msg').textContent='火炭會聚會 — 簽到';
-  main.innerHTML='<div class="hdr"><span>尚未簽到</span><span class="cnt">'+all.length+' / '+total+'</span></div>'+
-    all.map(function(x){return renderRow(x);}).join('');
 
-  main.querySelectorAll('.row').forEach(function(row){
-    row.addEventListener('click',function(){
-      if(locked)return;
-      showConfirm(row.dataset.type,parseInt(row.dataset.id),row.dataset.name,row.dataset.label);
+  if(tabFilter==='checked'){
+    main.innerHTML='<div class="hdr"><span>已簽到嘉賓</span><span class="cnt">'+done.length+'</span></div>'+
+      done.map(function(x){return renderRow(x);}).join('');
+    main.querySelectorAll('.row').forEach(function(row){
+      row.addEventListener('click',function(){
+        showPersonCard(row.dataset.type,parseInt(row.dataset.id));
+      });
     });
-  });
+  } else {
+    main.innerHTML='<div class="hdr"><span>未簽到嘉賓</span><span class="cnt">'+all.length+' / '+total+'</span></div>'+
+      all.map(function(x){return renderRow(x);}).join('');
+    main.querySelectorAll('.row').forEach(function(row){
+      row.addEventListener('click',function(){
+        if(locked)return;
+        showConfirm(row.dataset.type,parseInt(row.dataset.id),row.dataset.name,row.dataset.label);
+      });
+    });
+  }
+  // Update tab button counts
+  var uBtn=document.getElementById('bar-unchecked');
+  var cBtn=document.getElementById('bar-checked');
+  if(uBtn) uBtn.innerHTML = '<span class="tab-icon">👥</span><span>未簽到 ('+all.length+')</span>';
+  if(cBtn) cBtn.innerHTML = '<span class="tab-icon">✅</span><span>已簽到 ('+done.length+')</span>';
 }
 
 function renderRow(x){
   var meta=x.p.professional||x.p.chapter||x.label;
-  return '<div class="row" data-type="'+x.type+'" data-id="'+x.p.id+'" data-name="'+E(x.p.name)+'" data-label="'+x.label+'"><div class="av '+x.type+'">'+E(x.p.name.charAt(0))+'</div><div class="info"><div class="n">'+E(x.p.name)+'</div><div class="m">'+E(meta)+'</div></div></div>';
+  var tblNum=(x.att&&x.att.table_number)?x.att.table_number:(x.p.table_number||'');
+  var tbl=tblNum?'<span class="tbl">'+E(tblNum)+'號枱</span>':'';
+  return '<div class="row" data-type="'+x.type+'" data-id="'+x.p.id+'" data-name="'+E(x.p.name)+'" data-label="'+x.label+'"><div class="av '+x.type+'">'+E(x.p.name.charAt(0))+'</div><div class="info"><div class="n">'+E(x.p.name)+'</div><div class="m">'+E(meta)+'</div></div>'+tbl+'</div>';
 }
 
 function showConfirm(type,id,name,label){
@@ -223,7 +338,7 @@ function showConfirm(type,id,name,label){
     document.getElementById('by').textContent='處理中...';
     doCheckin(type,id,name).then(function(r){
       if(!r){clean();return;}
-      locked=true;last=r;clean();render();
+      locked=true;last=r;clean();render();playSuccess();
     }).catch(function(e){
       alert(e&&e.message==='已簽到'?'此人已簽到，請勿重複簽到':'簽到失敗，請重試');
       clean();
@@ -265,7 +380,7 @@ function showFPSQR(phone,fee){
 function directCheckin(attId){
   A('/attendance',{method:'PUT',body:JSON.stringify({id:attId,payment:'paid'})}).then(function(){
     document.getElementById('main').innerHTML='<div class="result"><div style="font-size:48px;margin-bottom:16px">✅</div><div class="rname">簽到完成</div><div class="rtime">多謝光臨</div><button onclick="location.reload()" class="btn btn-primary" style="margin-top:20px">返回</button></div>';
-    document.getElementById('bar-msg').textContent='已簽到 ✓';
+    playSuccess();
   });
 }
 function uploadGuestReceipt(attId){
@@ -280,7 +395,7 @@ function uploadGuestReceipt(attId){
         status.innerHTML='<span style="color:#10b981">✅ 上傳成功！</span>';
         setTimeout(function(){
           document.getElementById('main').innerHTML='<div class="result"><div style="font-size:48px;margin-bottom:16px">🎉</div><div class="rname">感謝</div><div class="rtime">付款憑證已收到</div><button onclick="location.reload()" class="btn btn-primary" style="margin-top:20px">返回</button></div>';
-          document.getElementById('bar-msg').textContent='已上傳 ✓';
+          // receipt uploaded
         },1000);
       }else{
         status.innerHTML='<span style="color:#ef4444">❌ 上傳失敗，請重試</span>';

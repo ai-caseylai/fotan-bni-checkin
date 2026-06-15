@@ -25,11 +25,11 @@ export async function onRequest(context) {
     }
     if (request.method === 'PUT') {
       const body = await request.json();
-      const { id, substitute, payment, payment_method, arrival_time, remark } = body;
+      const { id, substitute, payment, payment_method, arrival_time, remark, table_number } = body;
       if (!id) return Response.json({ error: 'ID required' }, { status: 400, headers: cors });
       await env.DB.prepare(
-        'UPDATE attendance SET substitute=?, payment=?, payment_method=?, arrival_time=?, remark=? WHERE id=?'
-      ).bind(substitute || '', payment || '', payment_method || '', arrival_time || '', remark || '', id).run();
+        'UPDATE attendance SET substitute=?, payment=?, payment_method=?, arrival_time=?, remark=?, table_number=? WHERE id=?'
+      ).bind(substitute || '', payment || '', payment_method || '', arrival_time || '', remark || '', table_number || '', id).run();
       return Response.json({ ok: true }, { headers: cors });
     }
     if (request.method === 'POST') {

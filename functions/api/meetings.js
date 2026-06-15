@@ -20,15 +20,22 @@ export async function onRequest(context) {
         return Response.json(meeting, { headers: cors });
       }
       const rows = await env.DB.prepare('SELECT * FROM meetings ORDER BY date DESC, id DESC').all();
+      // Add attendance stats for each meeting
+      for (const m of rows.results) {
+        const stats = await env.DB.prepare(
+          "SELECT COUNT(*) as total, SUM(CASE WHEN person_type='member' THEN 1 ELSE 0 END) as members, SUM(CASE WHEN person_type='guest' THEN 1 ELSE 0 END) as guests, SUM(CASE WHEN payment='paid' THEN 1 ELSE 0 END) as paid, SUM(CASE WHEN (payment='' OR payment='unpaid') AND arrival_time!='absent' THEN 1 ELSE 0 END) as unpaid FROM attendance WHERE meeting_id=?"
+        ).bind(m.id).first();
+        m.stats = stats;
+      }
       return Response.json(rows.results, { headers: cors });
     }
     if (request.method === 'POST') {
       const body = await request.json();
-      const { date, type, collector, guest_fee, attendance } = body;
+      const { date, type, collector, guest_fee, table_number, attendance } = body;
       if (!date) return Response.json({ error: 'Date required' }, { status: 400, headers: cors });
 
-      const result = await env.DB.prepare('INSERT INTO meetings (date, type, collector, guest_fee) VALUES (?,?,?,?)')
-        .bind(date, type || 'regular', collector || '', guest_fee || 0).run();
+      const result = await env.DB.prepare('INSERT INTO meetings (date, type, collector, guest_fee, table_number) VALUES (?,?,?,?,?)')
+        .bind(date, type || 'regular', collector || '', guest_fee || 0, table_number || '').run();
       const meetingId = result.meta.last_row_id;
 
       if (attendance && Array.isArray(attendance)) {
@@ -40,6 +47,18 @@ export async function onRequest(context) {
         await env.DB.batch(batch);
       }
       return Response.json({ id: meetingId }, { headers: cors });
+    }
+    if (request.method === 'PUT') {
+      if (!id) return Response.json({ error: 'ID required' }, { status: 400, headers: cors });
+      const body = await request.json();
+      const sets = [], vals = [];
+      for (const k of ['date','type','collector','guest_fee','table_number']) {
+        if (body[k] !== undefined) { sets.push(k+'=?'); vals.push(body[k]); }
+      }
+      if (!sets.length) return Response.json({ error: 'No fields' }, { status: 400, headers: cors });
+      vals.push(id);
+      await env.DB.prepare('UPDATE meetings SET '+sets.join(',')+' WHERE id=?').bind(...vals).run();
+      return Response.json({ ok: true }, { headers: cors });
     }
     if (request.method === 'DELETE') {
       if (!id) return Response.json({ error: 'ID required' }, { status: 400, headers: cors });

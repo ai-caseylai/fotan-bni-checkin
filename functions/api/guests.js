@@ -37,7 +37,7 @@ export async function onRequest(context) {
       if (!id) return Response.json({ error: 'ID required' }, { status: 400, headers: cors });
       const body = await request.json();
       const sets = [], vals = [];
-      for (const k of ['name','professional','tel','invited_by','meeting_id','active']) {
+      for (const k of ['name','professional','tel','invited_by','meeting_id','table_number','active']) {
         if (body[k] !== undefined) { sets.push(`${k}=?`); vals.push(body[k]); }
       }
       vals.push(id);

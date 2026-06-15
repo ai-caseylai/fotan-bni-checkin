@@ -5,11 +5,12 @@ export async function onRequest(context) {
   if (!name) return new Response('Missing name', { status: 400 });
 
   try {
-    const obj = await env.R2.get(name + '.png');
+    let obj = await env.R2.get(name);
+    if (!obj) obj = await env.R2.get(name + '.png');
     if (!obj) return new Response('Not found', { status: 404 });
     return new Response(obj.body, {
       headers: {
-        'Content-Type': obj.httpMetadata?.contentType || 'image/png',
+        'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
         'Cache-Control': 'public, max-age=3600'
       }
     });

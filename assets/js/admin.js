@@ -72,7 +72,7 @@ function switchPage(page) {
   document.querySelectorAll('.sb-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.getElementById('topbar-title').textContent = {
     overview: '總覽', meetings: '會議管理', members: '會員管理',
-    guests: '來賓管理', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練'
+    guests: '來賓管理', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練', skill: '火炭會 Skill'
   }[page] || '';
   if (page !== 'checkin') { clearInterval(ciPollTimer); ciPollTimer = null; }
   loadPage(page).catch(function(e) {
@@ -91,6 +91,7 @@ async function loadPage(page) {
     case 'checkin': await renderCheckinOp(pc); break;
     case 'settings': await renderSettingsPage(pc); break;
     case 'qatraining': await renderQATraining(pc); break;
+    case 'skill': await renderSkillPage(pc); break;
   }
 }
 
@@ -378,19 +379,21 @@ async function renderMeetings(pc) {
       ${calHTML}
       <div class="panel-body"${mtgViewMode==='calendar'?' style="display:none"':''}>
         <table class="data-table">
-          <thead><tr><th></th><th>日期</th><th>類型</th><th>收款人</th><th>來賓費</th><th></th></tr></thead>
-          <tbody>${meetings.map(m => `<tr class="expand-tr" data-mid="${m.id}" onclick="toggleMeetingRow(${m.id})">
+          <thead><tr><th></th><th>日期</th><th>類型</th><th>會員</th><th>來賓</th><th>已收</th><th>未收</th><th></th></tr></thead>
+          <tbody>${meetings.map(m => { var s=m.stats||{}; return `<tr class="expand-tr" data-mid="${m.id}" onclick="toggleMeetingRow(${m.id})">
             <td><span class="arrow">▶</span></td>
             <td><strong>${m.date}</strong></td>
             <td>${m.type==='regular'?'例會':m.type==='anniversary'?'週年聚餐':'特別會議'}</td>
-            <td>${esc(m.collector||'-')}</td>
-            <td>${m.guest_fee||0}</td>
+            <td>${s.members||0}</td>
+            <td>${s.guests||0}</td>
+            <td style="color:#10b981;font-weight:600">${s.paid||0}</td>
+            <td style="color:#ef4444;font-weight:600">${s.unpaid||0}</td>
             <td class="btns">
               <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();editMeeting(${m.id})">編輯</button>
               <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMeeting(${m.id})">刪除</button>
             </td>
           </tr>
-          <tr class="detail-row" id="att-${m.id}"><td colspan="6"></td></tr>`).join('')}</tbody>
+          <tr class="detail-row" id="att-${m.id}"><td colspan="9"></td></tr>`; }).join('')}</tbody>
         </table>
         ${meetings.length===0 ? '<div class="empty">暫無會議記錄</div>' : ''}
       </div>
@@ -512,15 +515,14 @@ function showMeetingForm(editId) {
       date: document.getElementById('mt-date').value,
       type: document.getElementById('mt-type').value,
       collector: document.getElementById('mt-collector').value,
-      guest_fee: parseInt(document.getElementById('mt-fee').value) || 0
+      guest_fee: parseInt(document.getElementById('mt-fee').value) || 0,
+      table_number: ''
     };
     if (editId) {
-      body.id = editId;
-      // Update via PUT-like approach — we need to handle this
-      // For now, delete and re-create, or just update fields
-      await api(`/meetings?id=${editId}`, { method: 'DELETE' });
+      await api(`/meetings?id=${editId}`, { method: 'PUT', body: JSON.stringify(body) });
+    } else {
+      await api('/meetings', { method: 'POST', body: JSON.stringify(body) });
     }
-    await api('/meetings', { method: 'POST', body: JSON.stringify(body) });
     hideModal();
     toast(editId ? '會議已更新' : '會議已建立');
     switchPage('meetings');
@@ -659,7 +661,7 @@ function renderTableBody(type, list) {
       }).join('')}
       <td class="btns">
         <button class="btn btn-outline btn-sm" onclick="showPersonForm('${type}',${p.id})">編輯</button>
-        <button class="btn btn-danger btn-sm" onclick="deletePerson('${type}',${p.id},'${esc(p.name)}')">刪除</button>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deletePerson('${type}',${p.id},'${esc(p.name)}')">刪除</button>
       </td>
     </tr>`).join('')}</tbody></table>
     ${filtered.length===0?'<div class="empty">無匹配結果</div>':''}`;
@@ -819,11 +821,12 @@ async function showPersonForm(type, editId) {
       body.fee_paid_date = document.getElementById('pf-fee-date')?.value || '';
       body.professional = document.getElementById('pf-prof')?.value || '';
       body.role = document.getElementById('pf-role')?.value || '會員';
+      body.bio = document.getElementById('pf-bio')?.value || '';
     }
     if (type === 'guest' || type === 'observer') body.professional = document.getElementById('pf-prof')?.value || '';
     if (type === 'observer') body.chapter = document.getElementById('pf-chapter')?.value || '';
     if (type === 'guest' || type === 'observer') body.invited_by = document.getElementById('pf-invited')?.value || '';
-    if (type === 'guest') body.meeting_id = document.getElementById('pf-meeting')?.value || null;
+    if (type === 'guest') { body.meeting_id = document.getElementById('pf-meeting')?.value || null; }
 
     if (editId) {
       await api(`/${type}s?id=${editId}`, { method: 'PUT', body: JSON.stringify(body) });
@@ -1028,16 +1031,30 @@ async function showCheckinPersonOps(type, pid, name) {
     }
     receiptHtml += '<div style="margin-top:6px"><input type="file" id="ci-receipt" accept="image/*" style="width:100%;font-size:12px;margin-bottom:4px"><button class="btn btn-sm btn-primary" style="width:100%" onclick="uploadCheckinReceipt('+pid+',\''+type+'\')">上傳憑證</button></div>';
   }
+  var curTbl = att ? esc(att.table_number||'') : '';
   showModal('👤 '+esc(name), `
     <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${absent?'✕ 缺席':(att?'簽到時間: '+esc(att.arrival_time||'—'):'尚未簽到')} · ${paid?'✅ 已付':'❌ 未付'}</div>
+    <div style="margin-bottom:8px"><label style="font-size:11px;color:var(--text2)">枱號</label><input type="text" id="ci-table" value="${curTbl}" placeholder="枱號" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px"></div>
     <div style="display:flex;gap:6px;margin-bottom:8px">
-      <button class="btn btn-sm btn-primary" style="flex:1" onclick="hideModal();setTimeOp('${type}',${pid})">🕐 設定時間</button>
+      <button class="btn btn-sm btn-primary" style="flex:1" onclick="saveCheckinOps('${type}',${pid},${att?att.id:0})">💾 儲存</button>
       <button class="btn btn-sm" style="flex:1;background:${paid?'#10b981':'#f59e0b'};color:#fff" onclick="togglePayOp('${type}',${pid});hideModal()">${paid?'✅ 已付':'💰 標記已付'}</button>
     </div>
     <button class="btn btn-sm btn-outline" style="width:100%;margin-bottom:4px;color:#94a3b8" onclick="markAbsent('${type}',${pid},${absent?'false':'true'});hideModal()">${absent?'↩ 取消缺席':'✕ 標記缺席'}</button>
     ${receiptHtml}
   `);
 }
+async function saveCheckinOps(type, pid, attId) {
+  var tbl = document.getElementById('ci-table')?.value || '';
+  if (attId) {
+    await api('/attendance', {method:'PUT',body:JSON.stringify({id:attId,table_number:tbl})});
+    var att = meetingAttendance.find(a => a.id === attId);
+    if (att) att.table_number = tbl;
+    toast('已儲存');
+    hideModal();
+    renderCheckinOpList();
+  }
+}
+
 async function uploadCheckinReceipt(memberId, type) {
   const file = document.getElementById('ci-receipt')?.files[0];
   if (!file) { toast('請選擇檔案'); return; }
@@ -1121,6 +1138,16 @@ async function renderSettingsPage(pc) {
       ]
     },
     {
+      icon: '🏅', title: '委員介紹 & 火炭會介紹 & 申請入會',
+      fields: [
+        { key: 'joinLink', label: '申請入會連結', placeholder: 'https://forms.gle/xxx' },
+      ],
+      textareas: [
+        { key: 'productIntro', label: '委員介紹（主頁顯示）', placeholder: '主席：xxx\n副主席：xxx\n...', rows: 5 },
+        { key: 'aboutUs', label: '火炭會介紹（主頁顯示）', placeholder: '火炭會聚會成立於...', rows: 5 },
+      ]
+    },
+    {
       icon: '💳', title: '付款連結與 QR 碼',
       fields: [
         { key: 'paymeLink', label: 'PayMe 付款連結', placeholder: 'https://payme.hsbc/fotan' },
@@ -1174,7 +1201,8 @@ async function renderSettingsPage(pc) {
   });
 
   pc.innerHTML = '<div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between"><h2 style="font-size:20px;font-weight:700">⚙️ 系統設定</h2><button class="btn btn-primary" onclick="saveSettings()">💾 儲存全部設定</button></div>' + html +
-    '<div class="settings-section"><div class="settings-section-hdr"><span class="settings-section-icon">🔐</span> 修改管理密碼</div><div class="settings-section-body" style="padding:16px"><div style="display:flex;gap:8px;align-items:flex-end"><input type="password" id="set-new-pwd" placeholder="新密碼" style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none"><button class="btn btn-primary" onclick="changePassword()">確認修改</button></div><p id="pwd-msg" style="font-size:11px;margin-top:6px;display:none"></p></div></div>'+
+    '<div class="settings-section"><div class="settings-section-hdr"><span class="settings-section-icon">🤖</span> Telegram Bot 設定</div><div class="settings-section-body" style="padding:16px;text-align:center"><p style="font-size:13px;color:var(--text2);margin-bottom:8px">Bot: @fotanbot · 收發訊息 + R2 檔案上傳</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="fetch(\'/api/telegram?action=setup\').then(r=>r.json()).then(d=>toast(d.ok?\'Webhook 已設定！\':\'失敗：\'+d.description))">🔗 設定 Webhook</button><button class="btn btn-sm btn-outline" onclick="fetch(\'/api/telegram?action=info\').then(r=>r.json()).then(d=>toast(JSON.stringify(d.result||d)))">ℹ️ Webhook 狀態</button><button class="btn btn-sm btn-outline" onclick="fetch(\'/api/telegram?action=delete\').then(r=>r.json()).then(d=>toast(d.ok?\'Webhook 已刪除\':\'失敗\'))">🗑️ 刪除 Webhook</button></div><p style="font-size:11px;color:var(--text2);margin-top:8px">Webhook URL: https://fotan.techforliving.net/api/telegram</p></div></div>'+
+    '<div class="settings-section"><div class="settings-section-hdr"><span class="settings-section-icon">🔐</span> 修改管理密碼</div><div class="settings-section-body" style="padding:16px"><div style="display:flex;gap:8px;align-items:flex-end"><input type="password" id="set-old-pwd" placeholder="舊密碼" style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none"><input type="password" id="set-new-pwd" placeholder="新密碼" style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none"><button class="btn btn-primary" onclick="changePassword()">確認修改</button></div><p id="pwd-msg" style="font-size:11px;margin-top:6px;display:none"></p></div></div>'+
     '<div class="settings-section"><div class="settings-section-hdr"><span class="settings-section-icon">💿</span> 資料庫備份</div><div class="settings-section-body" style="padding:16px;text-align:center"><p style="font-size:13px;color:var(--text2);margin-bottom:12px">下載所有資料表（members, guests, meetings, attendance, settings, receipts）為 JSON 檔案</p><button class="btn btn-primary" onclick="window.open(\'/api/backup\')">📥 下載備份 JSON</button></div></div>';
 
   window._settingsFields = allFields;
@@ -1466,7 +1494,10 @@ async function sendChat() {
 function appendChatMsg(role, text) {
   const div = document.createElement('div');
   div.className = 'chat-msg '+role;
-  div.innerHTML = text;
+  // Strip markdown code fences, convert newlines to <br>
+  var t = text.replace(/```/g, '');
+  t = t.replace(/\n/g, '<br>');
+  div.innerHTML = t;
   document.getElementById('chat-msgs').appendChild(div);
   document.getElementById('chat-msgs').scrollTop = document.getElementById('chat-msgs').scrollHeight;
 }
@@ -1588,17 +1619,20 @@ function toast(msg) {
 async function changePassword() {
   const pwd = document.getElementById('set-new-pwd').value.trim();
   const msg = document.getElementById('pwd-msg');
-  if (!pwd || pwd.length < 4) { msg.textContent = '密碼至少4位'; msg.style.color = '#ef4444'; msg.style.display = 'block'; return; }
+  const oldPwd = document.getElementById('set-old-pwd').value;
+  if (!pwd || pwd.length < 4) { msg.textContent = '新密碼至少4位'; msg.style.color = '#ef4444'; msg.style.display = 'block'; return; }
+  if (!oldPwd) { msg.textContent = '請輸入舊密碼'; msg.style.color = '#ef4444'; msg.style.display = 'block'; return; }
   try {
     const res = await fetch(API + '/auth?action=change_pwd', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pwd })
+      body: JSON.stringify({ oldPassword: oldPwd, password: pwd })
     });
     const data = await res.json();
     if (data.ok) {
       msg.textContent = '密碼已更新';
       msg.style.color = '#10b981';
+      document.getElementById('set-old-pwd').value = '';
       document.getElementById('set-new-pwd').value = '';
     } else {
       msg.textContent = data.error || '修改失敗';
@@ -1606,4 +1640,240 @@ async function changePassword() {
     }
   } catch(e) { msg.textContent = '連線失敗'; msg.style.color = '#ef4444'; }
   msg.style.display = 'block';
+}
+
+// ── Chat File Upload ──────────────────────────────
+async function uploadChatFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const isImg = file.type.startsWith('image/');
+  const isPdf = file.type === 'application/pdf';
+  var fname = file.name.toLowerCase();
+  const isExcel = file.type.includes('spreadsheet') || file.type.includes('excel') || fname.endsWith('.xls') || fname.endsWith('.xlsx') || fname.endsWith('.csv');
+  const icon = isImg ? '🖼️' : isPdf ? '📄' : isExcel ? '📊' : '📁';
+
+  if (isExcel) {
+    if (typeof XLSX === 'undefined') {
+      appendChatMsg('system', 'Excel 組件載入中，請稍後再試');
+      input.value = '';
+      return;
+    }
+    // Parse Excel and import data
+    appendChatMsg('user', '📊 解析中：' + esc(file.name));
+    appendChatMsg('assistant', '<i>讀取 Excel 資料...</i>');
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        var wb = XLSX.read(e.target.result, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        if (rows.length < 2) { document.querySelector('#chat-msgs .chat-msg:last-child').remove(); appendChatMsg('system', 'Excel 無數據'); return; }
+
+        const headers = rows[0];
+        const nameIdx = headers.findIndex(h => h && (String(h).includes('名') || String(h).toLowerCase().includes('name')));
+        const telIdx = headers.findIndex(h => h && (String(h).includes('電') || String(h).includes('tel') || String(h).includes('phone')));
+        const profIdx = headers.findIndex(h => h && (String(h).includes('專業') || String(h).includes('行業')));
+        const emailIdx = headers.findIndex(h => h && (String(h).includes('mail') || String(h).includes('電郵')));
+
+        if (nameIdx < 0) { document.querySelector('#chat-msgs .chat-msg:last-child').remove(); appendChatMsg('system', '找不到名稱欄位'); return; }
+
+        const data = rows.slice(1).filter(r => r[nameIdx]).map(r => ({
+          name: String(r[nameIdx] || '').trim(),
+          tel: telIdx >= 0 ? String(r[telIdx] || '').trim() : '',
+          professional: profIdx >= 0 ? String(r[profIdx] || '').trim() : '',
+          email: emailIdx >= 0 ? String(r[emailIdx] || '').trim() : ''
+        }));
+
+        document.querySelector('#chat-msgs .chat-msg:last-child').remove();
+        appendChatMsg('assistant', '📊 找到 <b>' + data.length + '</b> 筆資料。匯入中...');
+
+        let imported = 0;
+        for (const p of data) {
+          try {
+            const resp = await fetch('/api/members', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(p)
+            });
+            const respData = await resp.json();
+            if (!respData.error) imported++;
+          } catch (e) { /* skip */ }
+        }
+
+        document.querySelector('#chat-msgs .chat-msg:last-child').remove();
+        appendChatMsg('assistant', '✅ 成功匯入 <b>' + imported + '</b> / ' + data.length + ' 筆資料！<br><small>類型：會員 · 可到會員管理查看</small>');
+      } catch (e) {
+        document.querySelector('#chat-msgs .chat-msg:last-child').remove();
+        appendChatMsg('system', 'Excel 解析失敗：' + esc(e.message));
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    input.value = '';
+    return;
+  }
+
+  // Non-Excel files: upload to R2
+  appendChatMsg('user', icon + ' 上傳中：' + esc(file.name) + ' (' + formatFileSize(file.size) + ')');
+  appendChatMsg('assistant', '<i>處理中...</i>');
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    document.querySelector('#chat-msgs .chat-msg:last-child').remove();
+    try {
+      const resp = await fetch('/api/chat-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, data: reader.result, content_type: file.type })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        appendChatMsg('assistant', icon + ' 檔案已儲存！<br><small>R2: ' + esc(data.key) + ' · ' + formatFileSize(data.size) + '</small><br><a href="' + data.url + '" target="_blank" style="color:var(--primary)">🔗 開啟檔案</a>');
+        // For images, also try AI understanding
+        if (isImg && typeof window._analyzeImage === 'function') {
+          appendChatMsg('assistant', '<i>🔍 AI 分析中...</i>');
+          var analysis = await window._analyzeImage(reader.result);
+          if (analysis) {
+            document.querySelector('#chat-msgs .chat-msg:last-child').remove();
+            appendChatMsg('assistant', '🔍 <b>AI 分析：</b><br>' + analysis);
+          } else {
+            document.querySelector('#chat-msgs .chat-msg:last-child').remove();
+          }
+        }
+      } else {
+        appendChatMsg('system', '上傳失敗：' + esc(data.error));
+      }
+    } catch (e) {
+      document.querySelector('#chat-msgs .chat-msg:last-child').remove();
+      appendChatMsg('system', '上傳失敗');
+    }
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+window._analyzeImage = async function(dataUrl) {
+  try {
+    var resp = await fetch('/api/image-analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl })
+    });
+    var data = await resp.json();
+    return data.reply || null;
+  } catch(e) { return null; }
+};
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ── Skill Page ────────────────────────────────────
+async function renderSkillPage(pc) {
+  pc.innerHTML = `
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px">🦞 火炭會 Skill</h2>
+    <div class="panel">
+      <div class="panel-header"><h2>📥 下載 Skill 檔案</h2></div>
+      <div class="panel-body" style="padding:16px;text-align:center">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">將此 Skill 檔案放到 OpenClaw / Claude Code 的 skills 目錄即可使用</p>
+        <button class="btn btn-primary" onclick="downloadSkill()">📥 下載 火炭會 Skill</button>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-header"><h2>🔑 Token 管理</h2><button class="btn btn-primary btn-sm" onclick="createSkillToken()">+ 新增 Token</button></div>
+      <div class="panel-body" style="padding:0">
+        <table class="data-table">
+          <thead><tr><th>名稱</th><th>Token</th><th>建立日期</th><th>到期日</th><th>狀態</th><th></th></tr></thead>
+          <tbody id="skill-token-list"><tr><td colspan="6">載入中...</td></tr></tbody>
+        </table>
+      </div>
+    </div>`;
+  loadSkillTokens();
+}
+
+async function loadSkillTokens() {
+  try {
+    const tokens = await fetch('/api/skill-tokens').then(r => r.json());
+    const el = document.getElementById('skill-token-list');
+    if (!tokens.length) { el.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2)">暫無 Token</td></tr>'; return; }
+    el.innerHTML = tokens.map(t => {
+      var isExpired = t.expires_at < new Date().toISOString().split('T')[0];
+      var isActive = t.active && !isExpired;
+      return '<tr><td>'+esc(t.name||'—')+'</td><td><code style="font-size:11px;background:#f1f5f9;padding:2px 6px;border-radius:4px">'+esc(t.token)+'</code></td><td>'+esc((t.created_at||'').substring(0,10))+'</td><td>'+(isExpired?'<span style="color:#ef4444">'+esc(t.expires_at)+'</span>':esc(t.expires_at))+'</td><td><span class="badge '+(isActive?'badge-paid':'badge-unpaid')+'">'+(isActive?'有效':'已過期')+'</span></td><td><button class="btn btn-danger btn-sm" onclick="deleteSkillToken('+t.id+')" style="font-size:10px;padding:2px 6px">刪除</button></td></tr>';
+    }).join('');
+  } catch(e) { document.getElementById('skill-token-list').innerHTML = '<tr><td colspan="6">載入失敗</td></tr>'; }
+}
+
+async function createSkillToken() {
+  var name = prompt('Token 用途／使用人名稱：');
+  if (!name) return;
+  try {
+    var resp = await fetch('/api/skill-tokens', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+    var data = await resp.json();
+    if (data.ok) {
+      toast('Token 已建立：' + data.token);
+      loadSkillTokens();
+    }
+  } catch(e) { toast('建立失敗'); }
+}
+
+async function deleteSkillToken(id) {
+  if (!confirm('確定刪除此 Token？')) return;
+  await fetch('/api/skill-tokens?id='+id, { method: 'DELETE' });
+  toast('已刪除');
+  loadSkillTokens();
+}
+
+function downloadSkill() {
+  var content = '---\nname: fotan-skill\ndescription: 火炭會龍蝦仔數據庫查詢\n---\n\n# 🦞 火炭會 Skill\n\n直接調用火炭會 Cloudflare D1 資料庫。\n\n## 驗證\n使用前需驗證 Token。調用 `/api/skill-tokens?action=verify&token=YOUR_TOKEN`\nToken 在後台「火炭會 Skill」頁面管理，有效期三個月。\n\n## 資料庫\n- D1: fotan-db\n- 指令: `npx wrangler d1 execute fotan-db --remote --command "<SQL>"`\n- 目錄: `/Users/perry/Documents/fotan`\n\n## 表格\nmembers (會員), guests (來賓), meetings (會議), attendance (出席), settings (設定)\n\n## 範例\n- 列出未付款人士\n- 查詢會議付款摘要\n- 搜尋會員聯絡資料\n';
+  var blob = new Blob([content], { type: 'text/markdown' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fotan-skill.md';
+  a.click();
+  toast('Skill 已下載');
+}
+
+// ── Telegram Log Viewer ──────────────────────────
+let tgCurrentChat = '';
+
+async function loadTelegramChats() {
+  document.getElementById('chat-msgs').style.display = 'none';
+  const log = document.getElementById('tg-log');
+  log.style.display = 'block';
+  log.innerHTML = '<div class="chat-msg system">載入中...</div>';
+  try {
+    const chats = await fetch('/api/telegram?action=chats').then(r => r.json());
+    if (!chats.length) { log.innerHTML = '<div class="chat-msg system">暫無 Telegram 對話</div>'; return; }
+    let html = '<div style="font-weight:700;margin-bottom:8px;color:var(--text)">📱 Telegram 對話 ('+chats.length+')</div>';
+    chats.forEach(c => {
+      html += '<div style="padding:8px;margin:4px 0;background:'+(tgCurrentChat===c.chat_id?'#e0f2fe':'#fff')+';border:1px solid var(--border);border-radius:8px;cursor:pointer" onclick="loadTelegramMessages(\''+c.chat_id+'\')">'+
+        '<div style="font-weight:600;font-size:12px">'+esc(c.first_name||c.username||c.chat_id)+' <span style="color:var(--text2);font-weight:400">@'+esc(c.username||'—')+'</span></div>'+
+        '<div style="font-size:10px;color:var(--text2)">'+esc(c.msg_count)+' 訊息 · 最後: '+esc((c.last_msg||'').substring(0,19))+'</div>'+
+      '</div>';
+    });
+    html += '<div style="margin-top:8px;font-size:10px;color:var(--text2)">點擊對話查看內容</div>';
+    log.innerHTML = html;
+  } catch(e) { log.innerHTML = '<div class="chat-msg system">載入失敗</div>'; }
+}
+
+async function loadTelegramMessages(chatId) {
+  tgCurrentChat = chatId;
+  const log = document.getElementById('tg-log');
+  log.innerHTML = '<div class="chat-msg system">載入中...</div>';
+  try {
+    const msgs = await fetch('/api/telegram?action=messages&chat_id='+chatId+'&limit=100').then(r => r.json());
+    let html = '<div style="margin-bottom:8px"><button class="btn btn-sm btn-outline" onclick="loadTelegramChats()" style="font-size:10px;padding:2px 8px">◀ 返回</button></div>';
+    msgs.forEach(m => {
+      const isUser = m.role === 'user';
+      html += '<div style="margin:4px 0;padding:6px 10px;background:'+(isUser?'#e0f2fe':'#f0fdf4')+';border-radius:8px;font-size:11px">'+
+        '<div style="font-weight:600;color:'+(isUser?'#2563eb':'#10b981')+';margin-bottom:2px">'+(isUser?'👤 '+esc(m.first_name||'用戶'):'🤖 Bot')+' <span style="font-size:9px;color:var(--text3)">'+esc((m.created_at||'').substring(11,19))+'</span></div>'+
+        '<div style="white-space:pre-wrap;word-break:break-word">'+esc(m.content||'')+'</div>'+
+      '</div>';
+    });
+    if (!msgs.length) html += '<div class="chat-msg system">暫無訊息</div>';
+    log.innerHTML = html;
+    log.scrollTop = log.scrollHeight;
+  } catch(e) { log.innerHTML = '<div class="chat-msg system">載入失敗</div>'; }
 }
