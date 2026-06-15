@@ -560,33 +560,37 @@ async function toggleMeetingRow(mid) {
   const getName = (type, id) => ({ member: allMembers, guest: allGuests }[type]||[]).find(p => p.id == id)?.name || '?';
   const typeLabel = { member: '會員', guest: '來賓' };
 
-  var sortedAtt = [];
-  ['member','guest'].forEach(function(t){
-    att.filter(function(a){return a.person_type===t}).forEach(function(a){sortedAtt.push(a)});
-  });
-  sortedAtt.sort(function(a,b){ return (getName(a.person_type,a.person_id)).localeCompare(getName(b.person_type,b.person_id),'zh-Hant'); });
-
-  var filterHtml = '<div style="margin-bottom:6px;display:flex;gap:8px;align-items:center"><select onchange="filterAttendees('+mid+',this.value)" style="padding:4px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;background:#fff"><option value="all">📋 全部</option><option value="paid">✅ 已繳費</option><option value="free">🆓 免費</option><option value="unpaid">❌ 未繳費</option><option value="absent">✕ 缺席</option></select><span style="font-size:10px;color:var(--text2)" id="att-count-'+mid+'">共 '+att.length+' 人</span></div>';
-
-  detail.firstElementChild.innerHTML = att.length === 0 ? '<div class="empty">無出席記錄</div>' :
-    filterHtml + '<div id="att-list-'+mid+'" style="padding:8px 0">'+
-    sortedAtt.map(function(a){
+  // Build section for a person type
+  function buildSection(secAtt, secLabel, secIcon) {
+    if (!secAtt.length) return '';
+    var sorted = [...secAtt].sort(function(a,b){ return (getName(a.person_type,a.person_id)).localeCompare(getName(b.person_type,b.person_id),'zh-Hant'); });
+    var html = '<div style="font-weight:700;font-size:12px;color:var(--text);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">'+secIcon+' '+secLabel+' <span style="color:var(--text2);font-weight:400">('+secAtt.length+'人)</span></div>';
+    html += sorted.map(function(a){
       var ptype = a.person_type;
       var pname = esc(getName(ptype, a.person_id));
-      var paid = a.payment==='paid'||a.payment==='free';
       var absent = a.arrival_time === 'absent';
-      var payCls = absent ? 'absent' : (a.payment==='free'?'free':(paid?'paid':'unpaid'));
-      var safeName = pname.replace(/'/g,"\\'");
-      return '<div class="att-mini att-'+payCls+'" style="cursor:pointer" onclick="event.stopPropagation();showOverviewPayOps(\''+ptype+'\','+a.person_id+','+a.id+',\''+safeName+'\','+paid+')">'+
-        '<span style="font-size:11px;color:var(--text2);min-width:44px">'+ (typeLabel[ptype]||ptype) +'</span>'+
+      var payCls = absent ? 'absent' : (a.payment==='free'?'free':(a.payment==='paid'?'paid':'unpaid'));
+      return '<div class="att-mini att-'+payCls+'">'+
         '<span style="flex:1;font-weight:500">'+pname+'</span>'+
         (a.substitute ? '<span style="font-size:11px;color:var(--text2)">代:'+esc(a.substitute)+'</span>' : '')+
-        '<span style="color:'+(absent?'#94a3b8':'var(--primary)')+';font-weight:500">'+(absent?'缺席':a.arrival_time||'—')+'</span>'+
+        '<span style="color:'+(absent?'#94a3b8':'var(--primary)')+';font-weight:500;min-width:50px;text-align:center">'+(absent?'缺席':a.arrival_time||'—')+'</span>'+
         '<span class="badge '+payClass(a.payment)+'">'+payLabel(a.payment)+'</span>'+
-        (a.payment_method ? '<span style="font-size:11px">'+a.payment_method+'</span>' : '')+
+        '<span style="font-size:10px;color:var(--text2);min-width:30px;text-align:right">'+(a.table_number?'🍽'+esc(a.table_number):'')+'</span>'+
       '</div>';
-    }).join('')+
-    '</div></div>';
+    }).join('');
+    return html;
+  }
+
+  var memberAtt = att.filter(function(a){return a.person_type==='member';});
+  var guestAtt = att.filter(function(a){return a.person_type==='guest';});
+
+  var filterHtml = '<div style="margin-bottom:8px;display:flex;gap:8px;align-items:center"><select onchange="filterAttendees('+mid+',this.value)" style="padding:4px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;background:#fff"><option value="all">📋 全部</option><option value="paid">✅ 已繳費</option><option value="free">🆓 免費</option><option value="unpaid">❌ 未繳費</option><option value="absent">✕ 缺席</option></select><span style="font-size:10px;color:var(--text2)" id="att-count-'+mid+'">👥 共 '+att.length+' 人 · 👤會員 '+memberAtt.length+' · 👥來賓 '+guestAtt.length+'</span></div>';
+
+  detail.firstElementChild.innerHTML = att.length === 0 ? '<div class="empty">無出席記錄</div>' :
+    filterHtml + '<div id="att-list-'+mid+'" style="padding:4px 0">'+
+    buildSection(memberAtt, '會員', '👤') +
+    buildSection(guestAtt, '來賓', '👥') +
+    '</div>';
   detail.classList.add('show');
 }
 
