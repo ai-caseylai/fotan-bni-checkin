@@ -116,6 +116,8 @@ async function renderOverview(pc) {
     var guestFee = current.guest_fee || 380;
     var unpaidTotal = unpaidMemberCount*memberFee + unpaidGuestCount*guestFee;
 
+    var expectedTotal = memberCount*memberFee + guestCount*guestFee;
+
     pc.innerHTML = `
     <div class="panel" style="margin-bottom:16px">
       <div class="panel-header">
@@ -132,8 +134,12 @@ async function renderOverview(pc) {
     <div class="stat-grid">
       <div class="stat-card"><div class="n">${paidCount}</div><div class="l">💰 已收人數</div></div>
       <div class="stat-card"><div class="n">${unpaidCount}</div><div class="l">⚠️ 未收人數</div></div>
-      <div class="stat-card"><div class="n" style="font-size:22px">會員 $${memberFee} · 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
-      <div class="stat-card"><div class="n" style="color:#10b981;font-size:28px">$${revenue.toLocaleString()}</div><div class="l">💰 預計總收入</div></div>
+      <div class="stat-card"><div class="n" style="font-size:20px">會員 $${memberFee} · 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
+      <div class="stat-card"><div class="n" style="color:#10b981;font-size:28px">$${revenue.toLocaleString()}</div><div class="l">💰 已收收入</div></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card" style="grid-column:span 2"><div class="n" style="color:#6366f1;font-size:26px">$${expectedTotal.toLocaleString()}</div><div class="l">📊 預計總收入（${att.length}人全部收齊）</div></div>
+      <div class="stat-card" style="grid-column:span 2"><div class="n" style="color:#f59e0b;font-size:20px">$${(expectedTotal-revenue).toLocaleString()}</div><div class="l">⚠️ 尚欠收入</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="panel">
