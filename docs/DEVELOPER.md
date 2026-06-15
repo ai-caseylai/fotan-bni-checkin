@@ -1,4 +1,4 @@
-# 開發文件 v3.6
+# 開發文件 v3.7
 
 ## 技術架構
 
@@ -9,7 +9,7 @@ fotan/
 │   └── index.html              # 後台管理 SPA
 ├── assets/
 │   ├── css/admin.css           # 後台樣式
-│   └── js/admin.js             # 後台邏輯（~2200 行）
+│   └── js/admin.js             # 後台邏輯（~2250 行）
 ├── functions/
 │   ├── api/                    # Pages Functions API 端點（21 個）
 │   │   ├── members.js, guests.js, meetings.js, attendance.js
@@ -79,3 +79,11 @@ meetings 表 5 個 fee 欄位 + attendance.price_tier。委員判定：role != '
 ## 保安
 
 登入防爆破（5次鎖15分鐘）、HttpOnly Cookie、Skill Token 90天、改密碼需舊密碼
+
+## v3.7 更新
+
+- 營收計算修正：只計 `paid` 排除 `free`
+- 總覽頁已收人數拆分為「收費」+「免費」兩卡片
+- 會員管理頁卡片直接顯示付款憑證縮圖
+- 簽到頁會員卡片顯示付款憑證縮圖
+- `loadMemberReceiptsForCards` + `renderCardReceipts` 批次載入機制

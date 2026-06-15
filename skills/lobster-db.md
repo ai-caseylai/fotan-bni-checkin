@@ -1,6 +1,6 @@
 ---
 name: fotan-skill
-description: 火炭會聚會簽到系統 v3.6 — 17 REST API + 多層收費 + 100% GUI 對應
+description: 火炭會聚會簽到系統 v3.7 — 17 REST API + 多層收費 + 100% GUI 對應
 ---
 
 # 火炭會 Skill v3.6

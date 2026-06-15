@@ -1,4 +1,4 @@
-# API 手冊 — 火炭會聚會簽到系統 v3.3
+# API 手冊 — 火炭會聚會簽到系統 v3.7
 
 ## 基礎資訊
 
@@ -377,7 +377,7 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -d '{"token": "lob_xxxx", "action": "meeting_stats", "meeting_id": 10}'
 ```
 
-回應：
+回應（含 revenue，v3.7 起只計 paid 不含 free）：
 ```json
 {
   "ok": true,
@@ -385,15 +385,18 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
     "id": 10,
     "date": "2026-06-20",
     "type": "anniversary",
-    "guest_fee": 380,
-    "total": 91,
-    "members": 18,
-    "guests": 73,
-    "paid": 48,
-    "free": 10,
-    "unpaid": 33,
+    "guest_fee": 398,
+    "member_fee": 398,
+    "committee_fee": 298,
+    "total": 118,
+    "members": 26,
+    "guests": 92,
+    "paid": 58,
+    "free": 12,
+    "unpaid": 48,
     "arrived": 0,
-    "absent": 0
+    "absent": 0,
+    "revenue": 23084
   }
 }
 ```
@@ -512,9 +515,9 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   "meetings": [
     {
       "id": 10, "date": "2026-06-20", "type": "anniversary",
-      "total": 91, "members": 18, "guests": 73,
-      "paid": 48, "free": 10, "unpaid": 33,
-      "arrived": 0, "absent": 0
+      "total": 118, "members": 26, "guests": 92,
+      "paid": 58, "free": 12, "unpaid": 48,
+      "arrived": 0, "absent": 0, "revenue": 23084
     }
   ]
 }
@@ -703,7 +706,7 @@ curl -s -X DELETE "https://fotan.techforliving.net/api/guests?id=100" -b cookies
 curl -s "https://fotan.techforliving.net/api/meetings" -b cookies.txt
 ```
 
-每筆會議含：`total`, `members`, `guests`, `paid`, `free`, `unpaid` 統計。
+每筆會議含：`total`, `members`, `guests`, `paid`, `free`, `unpaid`, `revenue` 統計（v3.7 起 revenue 只計 paid 不含 free）。
 
 ### POST — 新增
 ```bash
