@@ -93,7 +93,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 </div>
 <script>
 var API='/api';
-var meeting=null,members=[],guests=[],observers=[],checked=[],locked=false,last=null;
+var meeting=null,members=[],guests=[],checked=[],locked=false,last=null;
 
 var D={
   lunchFee:'388',paymeLink:'https://payme.hsbc/fotan',
@@ -124,10 +124,10 @@ function init(){
     }
     var prefix=meeting.date===today?'📅 ':'📅 [即將舉行] ';
     document.getElementById('sub').textContent=prefix+meeting.date+' '+(meeting.type==='regular'?'例會':meeting.type==='anniversary'?'週年聚餐':'特別會議');
-    return Promise.all([A('/members'),A('/guests'),A('/observers'),A('/attendance?meeting_id='+meeting.id)]);
+    return Promise.all([A('/members'),A('/guests'),A('/attendance?meeting_id='+meeting.id)]);
   }).then(function(r){
     if(!r)return;
-    members=r[0];guests=r[1];observers=r[2];checked=r[3];locked=false;
+    members=r[0];guests=r[1];checked=r[2];locked=false;
     render();
   });
 }
@@ -189,7 +189,7 @@ function showInfoModal(title, body){
 }
 
 function showPersonCard(type, pid){
-  var list=type==='member'?members:type==='guest'?guests:observers;
+  var list=type==='member'?members:guests;
   var p=list.find(function(x){return x.id===pid});
   if(!p) return;
   var name=E(p.name);
@@ -233,9 +233,8 @@ function vcfLink(p){
 function allPeople(){
   var map={};checked.forEach(function(a){map[a.person_type+'_'+a.person_id]=a});
   var all=[];
-  members.forEach(function(p){all.push({p:p,type:'member',label:'會員',att:map['member_'+p.id]||null})});
-  guests.forEach(function(p){all.push({p:p,type:'guest',label:'來賓',att:map['guest_'+p.id]||null})});
-  observers.forEach(function(p){all.push({p:p,type:'observer',label:'觀察員',att:map['observer_'+p.id]||null})});
+  members.forEach(function(p){if(map['member_'+p.id])all.push({p:p,type:'member',label:'會員',att:map['member_'+p.id]})});
+  guests.forEach(function(p){if(map['guest_'+p.id])all.push({p:p,type:'guest',label:'來賓',att:map['guest_'+p.id]})});
   all.sort(function(a,b){return (a.p.name||'').localeCompare(b.p.name||'')});
   return all;
 }
@@ -288,9 +287,10 @@ if(D.aliLink)h+='<a href="javascript:void(0)" onclick="showAlipayQR('+fee+')" st
     return;
   }
 
-  var all=allPeople().filter(function(x){return !x.att||(!x.att.arrival_time&&x.att.arrival_time!=='absent');});
-  var done=allPeople().filter(function(x){return !!x.att;});
-  var total=all.length+done.length;
+  var allPeople2=allPeople();
+  var all=allPeople2.filter(function(x){return !x.att||(!x.att.arrival_time&&x.att.arrival_time!=='absent');});
+  var done=allPeople2.filter(function(x){return !!(x.att&&x.att.arrival_time&&x.att.arrival_time!=='absent');});
+  var total=allPeople2.length;
 
   if(tabFilter==='checked'){
     main.innerHTML='<div class="hdr"><span>已簽到嘉賓</span><span class="cnt">'+done.length+'</span></div>'+
@@ -319,12 +319,27 @@ if(D.aliLink)h+='<a href="javascript:void(0)" onclick="showAlipayQR('+fee+')" st
 
 function renderRow(x){
   var meta=x.p.professional||x.p.chapter||x.label;
+  var payText='';
+  if(x.att){
+    var p=x.att.payment||'';
+    if(p==='paid'||p==='free') payText='<span style="color:#10b981;font-size:10px;font-weight:600;flex-shrink:0;margin-right:4px">已付款</span>';
+    else payText='<span style="color:#ef4444;font-size:10px;font-weight:600;flex-shrink:0;margin-right:4px">未付款</span>';
+  }
   var tblNum=(x.att&&x.att.table_number)?x.att.table_number:(x.p.table_number||'');
   var tbl=tblNum?'<span class="tbl">'+E(tblNum)+'號枱</span>':'';
-  return '<div class="row" data-type="'+x.type+'" data-id="'+x.p.id+'" data-name="'+E(x.p.name)+'" data-label="'+x.label+'"><div class="av '+x.type+'">'+E(x.p.name.charAt(0))+'</div><div class="info"><div class="n">'+E(x.p.name)+'</div><div class="m">'+E(meta)+'</div></div>'+tbl+'</div>';
+  return '<div class="row" data-type="'+x.type+'" data-id="'+x.p.id+'" data-name="'+E(x.p.name)+'" data-label="'+x.label+'"><div class="av '+x.type+'">'+E(x.p.name.charAt(0))+'</div><div class="info"><div class="n">'+E(x.p.name)+'</div><div class="m">'+E(meta)+'</div></div>'+payText+tbl+'</div>';
 }
 
 function showConfirm(type,id,name,label){
+  // Unpaid → redirect to payment page
+  var att=checked.find(function(a){return a.person_type===type&&a.person_id===id});
+  var isUnpaid=att&&(!att.payment||att.payment==='unpaid');
+  if(isUnpaid){
+    locked=true;
+    last={name:name,time:'',payment:'unpaid',attId:att.id};
+    render();
+    return;
+  }
   document.getElementById('main').classList.add('dimmed');
   document.getElementById('top').classList.add('dimmed');
   var ov=document.createElement('div');ov.className='overlay';
@@ -350,16 +365,17 @@ function showConfirm(type,id,name,label){
 function doCheckin(type,id,name){
   var exist=checked.find(function(a){return a.person_type===type&&a.person_id===id});
   var now=new Date(),time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  var pay='';
+  // Block unpaid people from checking in
+  if(exist && (!exist.payment || exist.payment==='unpaid')){
+    return Promise.reject(new Error('請先完成付款後再簽到'));
+  }
   var row=document.querySelector('.row[data-type="'+type+'"][data-id="'+id+'"]');
   if(row){row.remove();var hdr=document.querySelector('.hdr .cnt');if(hdr){var cur=hdr.textContent.split('/');var n=parseInt(cur[0])+1;hdr.textContent=n+' / '+cur[1];}}
   if(exist&&exist.arrival_time){
-    // Already signed in with time
     return Promise.reject(new Error('已簽到'));
   }
   if(exist){
-    // Has empty attendance record → update it
-    return A('/attendance',{method:'PUT',body:JSON.stringify({id:exist.id,arrival_time:time,payment:pay})}).then(function(r){return{name:name,time:time,payment:pay,attId:exist.id}});
+    return A('/attendance',{method:'PUT',body:JSON.stringify({id:exist.id,arrival_time:time})}).then(function(r){return{name:name,time:time,payment:exist.payment,attId:exist.id}});
   }
   // New attendance record
   return A('/attendance',{method:'POST',body:JSON.stringify({meeting_id:meeting.id,person_type:type,person_id:id,arrival_time:time,payment:pay})}).then(function(r){return{name:name,time:time,payment:pay,attId:r.id}});

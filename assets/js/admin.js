@@ -1,7 +1,7 @@
 // BNI Galaxy ST — Admin Backend
 const API = '/api';
 let currentPage = 'overview';
-let members = [], guests = [], observers = [], meetings = [];
+let members = [], guests = [], meetings = [];
 let currentMeeting = null;
 let meetingAttendance = [];
 let searchText = '';
@@ -87,7 +87,6 @@ async function loadPage(page) {
     case 'meetings': await renderMeetings(pc); break;
     case 'members': await renderTablePage(pc, 'member', '會員'); break;
     case 'guests': await renderTablePage(pc, 'guest', '來賓'); break;
-    case 'observers': await renderTablePage(pc, 'observer', '觀察員'); break;
     case 'checkin': await renderCheckinOp(pc); break;
     case 'settings': await renderSettingsPage(pc); break;
     case 'qatraining': await renderQATraining(pc); break;
@@ -167,6 +166,7 @@ async function renderOverviewCharts(mts) {
 
   const ctx1 = document.getElementById('chart-trend');
   if (ctx1) {
+    Chart.getChart(ctx1)?.destroy();
     new Chart(ctx1, {
       type: 'line',
       data: {
@@ -200,6 +200,7 @@ async function renderOverviewCharts(mts) {
 
   const ctx2 = document.getElementById('chart-payment');
   if (ctx2) {
+    Chart.getChart(ctx2)?.destroy();
     new Chart(ctx2, {
       type: 'doughnut',
       data: {
@@ -229,7 +230,7 @@ async function toggleOverviewMeeting(mid) {
   if (att.length === 0) { row.firstElementChild.innerHTML = '<div class="empty">暫無出席記錄</div>'; row.classList.add('show'); return; }
 
   await loadAllData();
-  const getName = (type, id) => ({member:members, guest:guests, observer:observers}[type]||[]).find(p => p.id===id);
+  const getName = (type, id) => ({member:members, guest:guests}[type]||[]).find(p => p.id===id);
   var html = '<div style="padding:12px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">'+
     att.map(a => {
       const p = getName(a.person_type, a.person_id);
@@ -306,14 +307,47 @@ async function exportDetailCSV() {
 }
 
 async function showOverviewPayOps(type, pid, attId, name, paid) {
-  var typeLabel = type==='member'?'會員':type==='guest'?'來賓':'觀察員';
-  var paySection = '<div style="text-align:center;padding:8px 0"><span style="font-size:14px;font-weight:700;color:'+(paid?'#10b981':'#f59e0b')+'">'+(paid?'✅ 已付款':'❌ 未付款')+'</span></div>';
-  if (!paid) {
-    paySection += '<div style="text-align:center;font-size:24px;font-weight:800;margin-bottom:8px">HK$388</div>';
-    if (type === 'member') {
-      paySection += '<div style="margin-top:8px"><label style="font-size:12px;font-weight:600;color:var(--text2)">📤 上傳付款憑證</label><div style="margin-top:4px"><input type="file" id="ov-receipt" accept="image/*" style="width:100%;font-size:12px;margin-bottom:4px"><button class="btn btn-primary btn-sm" style="width:100%" onclick="uploadOverviewReceipt('+pid+','+attId+')">確認上傳</button></div></div>';
+  var typeLabel = type==='member'?'會員':type==='guest'?'來賓':'';
+  var isFree = paid === 'free';
+  var payStatus = paid ? (isFree ? '🆓 免費' : '✅ 已付款') : '❌ 未付款';
+  // Load receipts — only show if they actually exist
+  var receiptImgs = '';
+  var imgTags = [];
+  // Checkin receipt (only if uploaded via receipt upload flow)
+  try {
+    var attRecord = await api('/attendance?meeting_id='+(meetings[0]?.id||10));
+    var thisAtt = Array.isArray(attRecord) ? attRecord.find(function(a){return a.id===attId}) : null;
+    if (thisAtt && thisAtt.payment_method === 'receipt_uploaded') {
+      var checkinUrl = '/api/image?name=receipt-att-'+attId;
+      imgTags.push('<a href="'+checkinUrl+'" target="_blank"><img src="'+checkinUrl+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0"></a>');
     }
-    paySection += '<div style="margin-top:10px"><button class="btn btn-outline btn-sm" style="width:100%" onclick="markOverviewPaid('+attId+')">✅ 直接標記已付款</button></div>';
+  } catch(e) {}
+  // Member receipts from member_receipts table
+  if (type === 'member') {
+    try {
+      var receipts = await loadReceipts(pid);
+      receipts.forEach(function(r) {
+        imgTags.push('<a href="/api/receipts?id='+r.id+'" target="_blank"><img src="/api/receipts?id='+r.id+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0"></a>');
+      });
+    } catch(e) {}
+  }
+  if (imgTags.length > 0) {
+    receiptImgs = '<div style="margin:8px 0"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">📄 已上傳憑證</div><div style="display:flex;gap:4px;flex-wrap:wrap">'+imgTags.join('')+'</div></div>';
+  }
+  var paySection = '<div style="text-align:center;padding:8px 0"><span style="font-size:14px;font-weight:700;color:'+(isFree?'#3b82f6':(paid?'#10b981':'#f59e0b'))+'">'+payStatus+'</span></div>';
+  paySection += receiptImgs;
+  if (!paid) {
+    paySection += '<div style="text-align:center;font-size:24px;font-weight:800;margin-bottom:12px">HK$388</div>';
+    // 1. 憑證付費
+    paySection += '<div style="background:#f0fdf4;border:1.5px solid #10b981;border-radius:10px;padding:12px;margin-bottom:8px"><div style="font-weight:700;font-size:13px;color:#10b981;margin-bottom:8px">📤 憑證付費</div>';
+    paySection += '<input type="file" id="ov-receipt" accept="image/*" style="width:100%;font-size:12px;margin-bottom:6px">';
+    paySection += '<button class="btn btn-sm" style="width:100%;background:#10b981;color:#fff" onclick="uploadOverviewReceipt('+pid+','+attId+')">確認上傳憑證</button></div>';
+    // 2. 免費
+    paySection += '<div style="background:#eff6ff;border:1.5px solid #3b82f6;border-radius:10px;padding:12px;margin-bottom:8px"><div style="font-weight:700;font-size:13px;color:#3b82f6;margin-bottom:8px">🆓 免費嘉賓</div>';
+    paySection += '<button class="btn btn-sm" style="width:100%;background:#3b82f6;color:#fff" onclick="markPaymentType('+attId+',\'free\')">標記為免費</button></div>';
+    // 3. 現金
+    paySection += '<div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:12px;margin-bottom:8px"><div style="font-weight:700;font-size:13px;color:#f59e0b;margin-bottom:8px">💵 現金付款</div>';
+    paySection += '<button class="btn btn-sm" style="width:100%;background:#f59e0b;color:#fff" onclick="markPaymentType('+attId+',\'paid\')">標記現金已付</button></div>';
   }
   showModal('👤 '+esc(name)+' · '+typeLabel, `
     ${paySection}
@@ -322,6 +356,11 @@ async function showOverviewPayOps(type, pid, attId, name, paid) {
     </div>
   `);
 }
+async function markPaymentType(attId, paymentType) {
+  await api('/attendance', {method:'PUT',body:JSON.stringify({id:attId,payment:paymentType})});
+  toast(paymentType==='free'?'已標記為免費':'已標記現金付款');
+  hideModal();
+}
 async function deleteAttendee(attId) {
   await api('/attendance', {method:'DELETE',body:JSON.stringify({id:attId})});
   toast('已刪除出席記錄');
@@ -329,11 +368,11 @@ async function deleteAttendee(attId) {
 }
 async function uploadOverviewReceipt(memberId, attId) {
   const file = document.getElementById('ov-receipt')?.files[0];
-  if (!file) { toast('請選擇檔案'); return; }
+  if (!file) { toast('請選擇憑證圖片'); return; }
   const reader = new FileReader();
   reader.onload = async () => {
     await api('/checkin-upload', {method:'POST',body:JSON.stringify({attendance_id:attId,data:reader.result})});
-    toast('已上傳並標記付款');
+    toast('憑證已上傳，已標記付款');
     hideModal();
   };
   reader.readAsDataURL(file);
@@ -462,17 +501,16 @@ async function toggleMeetingRow(mid) {
   const att = m.attendance || [];
   const allMembers = await api('/members?all=1');
   const allGuests = await api('/guests');
-  const allObservers = await api('/observers');
-  const getName = (type, id) => ({ member: allMembers, guest: allGuests, observer: allObservers }[type]||[]).find(p => p.id == id)?.name || '?';
-  const typeLabel = { member: '會員', guest: '來賓', observer: '觀察員' };
+  const getName = (type, id) => ({ member: allMembers, guest: allGuests }[type]||[]).find(p => p.id == id)?.name || '?';
+  const typeLabel = { member: '會員', guest: '來賓' };
 
   var sortedAtt = [];
-  ['member','guest','observer'].forEach(function(t){
+  ['member','guest'].forEach(function(t){
     att.filter(function(a){return a.person_type===t}).forEach(function(a){sortedAtt.push(a)});
   });
   sortedAtt.sort(function(a,b){ return (getName(a.person_type,a.person_id)).localeCompare(getName(b.person_type,b.person_id),'zh-Hant'); });
 
-  var filterHtml = '<div style="margin-bottom:6px;display:flex;gap:8px;align-items:center"><select onchange="filterAttendees('+mid+',this.value)" style="padding:4px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;background:#fff"><option value="all">📋 全部</option><option value="paid">✅ 已繳費</option><option value="unpaid">❌ 未繳費</option><option value="absent">✕ 缺席</option></select><span style="font-size:10px;color:var(--text2)" id="att-count-'+mid+'">共 '+att.length+' 人</span></div>';
+  var filterHtml = '<div style="margin-bottom:6px;display:flex;gap:8px;align-items:center"><select onchange="filterAttendees('+mid+',this.value)" style="padding:4px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;background:#fff"><option value="all">📋 全部</option><option value="paid">✅ 已繳費</option><option value="free">🆓 免費</option><option value="unpaid">❌ 未繳費</option><option value="absent">✕ 缺席</option></select><span style="font-size:10px;color:var(--text2)" id="att-count-'+mid+'">共 '+att.length+' 人</span></div>';
 
   detail.firstElementChild.innerHTML = att.length === 0 ? '<div class="empty">無出席記錄</div>' :
     filterHtml + '<div id="att-list-'+mid+'" style="padding:8px 0">'+
@@ -573,7 +611,7 @@ async function deleteMeeting(id) {
 // ── Members / Guests / Observers Table Page ───────
 async function renderTablePage(pc, type, title) {
   await loadAllData();
-  const list = { member: members, guest: guests, observer: observers }[type];
+  const list = { member: members, guest: guests,  }[type];
   const showMeetingFilter = type === 'guest';
   let meetingFilterHtml = '';
   if (showMeetingFilter) {
@@ -588,8 +626,8 @@ async function renderTablePage(pc, type, title) {
         <div style="display:flex;gap:6px;align-items:center">
           ${type==='member'||type==='guest'?`
           <span style="display:flex;gap:4px">
-            <button class="btn btn-sm `+(mgmtViewMode==='card'?'btn-primary':'btn-outline')+`" onclick="mgmtViewMode='card';renderTableBody('${type}',{member:members,guest:guests,observer:observers}['${type}'])" style="font-size:11px;padding:4px 10px">📇 卡片</button>
-            <button class="btn btn-sm `+(mgmtViewMode==='table'?'btn-primary':'btn-outline')+`" onclick="mgmtViewMode='table';renderTableBody('${type}',{member:members,guest:guests,observer:observers}['${type}'])" style="font-size:11px;padding:4px 10px">📋 表格</button>
+            <button class="btn btn-sm `+(mgmtViewMode==='card'?'btn-primary':'btn-outline')+`" onclick="mgmtViewMode='card';renderTableBody('${type}',{member:members,guest:guests}['${type}'])" style="font-size:11px;padding:4px 10px">📇 卡片</button>
+            <button class="btn btn-sm `+(mgmtViewMode==='table'?'btn-primary':'btn-outline')+`" onclick="mgmtViewMode='table';renderTableBody('${type}',{member:members,guest:guests}['${type}'])" style="font-size:11px;padding:4px 10px">📋 表格</button>
           </span>`:''}
           <button class="btn btn-primary btn-sm" onclick="showPersonForm('${type}')">+ 新增${title}</button>
         </div>
@@ -605,7 +643,7 @@ async function renderTablePage(pc, type, title) {
 
 async function filterByMeeting(type) {
   const mid = document.getElementById('meeting-filter').value;
-  const list = { member: members, guest: guests, observer: observers }[type];
+  const list = { member: members, guest: guests,  }[type];
   if (!mid) { renderTableBody(type, list); return; }
   const att = await api('/attendance?meeting_id='+mid);
   const attIds = new Set(att.filter(a => a.person_type === type).map(a => a.person_id));
@@ -614,10 +652,19 @@ async function filterByMeeting(type) {
   renderTableBody(type, filtered);
 }
 
-function renderTableBody(type, list) {
+async function renderTableBody(type, list) {
   const el = document.getElementById('tbl-body');
   const filtered = searchText ? list.filter(p => JSON.stringify(p).toLowerCase().includes(searchText.toLowerCase())) : list;
   const showExpand = type === 'guest' || type === 'member';
+
+  // Load payment map for guest table view
+  let payMap = {};
+  if (type === 'guest') {
+    try {
+      const att = await api('/attendance?meeting_id='+(meetings[0]?.id||10));
+      att.forEach(a => { if (a.person_type==='guest') payMap[a.person_id] = a.payment; });
+    } catch(e) {}
+  }
 
   if ((type === 'member' || type === 'guest') && mgmtViewMode === 'card') {
     el.innerHTML = `<div class="mgmt-card-grid">${filtered.map(p => {
@@ -665,8 +712,12 @@ function renderTableBody(type, list) {
         } else {
           const sorted = att.sort((a,b) => b.date.localeCompare(a.date));
           const items = sorted.map(a => {
-            var paid = a.payment==='paid'||a.payment==='free';
-            return '<span style="color:'+(paid?'#10b981':'#f59e0b')+'">'+a.date+' '+(paid?'✅':'❌')+'</span>';
+            var payIcon = a.payment==='paid'?'💰':(a.payment==='free'?'🆓':'❌💰');
+            var payColor = a.payment==='paid'||a.payment==='free'?'#10b981':'#f59e0b';
+            var arrived = a.arrival_time && a.arrival_time!=='absent';
+            var absent = a.arrival_time==='absent';
+            var arrIcon = arrived?'✅':(absent?'✕':'');
+            return '<span style="color:'+payColor+'">'+a.date+' '+payIcon+'</span>'+(arrIcon?' <span>'+arrIcon+'</span>':'');
           }).join(' · ');
           el.innerHTML = '📋 ' + items;
         }
@@ -677,17 +728,21 @@ function renderTableBody(type, list) {
     }
   }
 
-  // fallback: table for observer
-  const cols = { member: ['name','professional','tel','email','fee_paid_date'], guest: ['name','professional','tel','invited_by','meeting_id'], observer: ['name','professional','chapter','invited_by'] }[type];
+  // table view
+  const cols = { member: ['name','professional','tel','email','fee_paid_date'], guest: ['name','professional','tel','invited_by','meeting_id','payment'] }[type];
 
   el.innerHTML = `<table class="data-table">
-    <thead><tr>${cols.map(c => `<th>${c==='name'?'名稱':c==='tel'?'電話':c==='email'?'電郵':c==='fee_paid_date'?'會費付費日':c==='professional'?'專業':c==='chapter'?'Chapter':c==='invited_by'?'邀請人':c==='meeting_id'?'所屬聚會':''}</th>`).join('')}<th style="width:80px"></th></tr></thead>
+    <thead><tr>${cols.map(c => `<th>${c==='name'?'名稱':c==='tel'?'電話':c==='email'?'電郵':c==='fee_paid_date'?'會費付費日':c==='professional'?'專業':c==='chapter'?'Chapter':c==='invited_by'?'邀請人':c==='meeting_id'?'所屬聚會':c==='payment'?'付款狀態':''}</th>`).join('')}<th style="width:80px"></th></tr></thead>
     <tbody>${filtered.map(p => `<tr style="cursor:pointer" onclick="showPersonForm('${type}',${p.id})">
       ${cols.map(c => {
         if (c==='name') return '<td><strong>'+esc(p[c]||'')+'</strong></td>';
         if (c==='meeting_id') {
           var gm2 = p.meeting_id ? meetings.find(m => m.id===p.meeting_id) : null;
           return '<td>'+esc(gm2?gm2.date+' '+mLblText(gm2.type):'-')+'</td>';
+        }
+        if (c==='payment') {
+          var pmt = payMap[p.id] || '';
+          return '<td><span class="badge '+(pmt==='paid'?'badge-paid':pmt==='free'?'badge-free':'badge-unpaid')+'">'+(pmt==='paid'?'💰 已付':pmt==='free'?'🆓 免費':'❌💰 未付')+'</span></td>';
         }
         return '<td>'+esc(p[c]||'-')+'</td>';
       }).join('')}
@@ -706,7 +761,7 @@ function doSearch(type, val) {
     filterByMeeting(type);
     return;
   }
-  const list = { member: members, guest: guests, observer: observers }[type];
+  const list = { member: members, guest: guests,  }[type];
   renderTableBody(type, list);
 }
 
@@ -796,8 +851,8 @@ async function handleReceiptUpload(input) {
 }
 
 async function showPersonForm(type, editId) {
-  const labels = { member: '會員', guest: '來賓', observer: '觀察員' };
-  const list = { member: members, guest: guests, observer: observers }[type];
+  const labels = { member: '會員', guest: '來賓',  };
+  const list = { member: members, guest: guests,  }[type];
   const p = editId ? list.find(x => x.id === editId) || {} : {};
   if (type === 'guest' && !meetings.length) meetings = await api('/meetings');
 
@@ -808,13 +863,13 @@ async function showPersonForm(type, editId) {
     extra += `<label>電郵</label><input type="email" id="pf-email" value="${esc(p.email||'')}" placeholder="email@example.com">`;
     extra += `<label>會費付費日</label><input type="date" id="pf-fee-date" value="${esc(p.fee_paid_date||'')}">`;
   }
-  if (type === 'guest' || type === 'observer') {
+  if (type === 'guest') {
     extra += `<label>專業</label><input type="text" id="pf-prof" value="${esc(p.professional||'')}" placeholder="專業/行業">`;
   }
   if (type === 'observer') {
     extra += `<label>Chapter</label><input type="text" id="pf-chapter" value="${esc(p.chapter||'')}" placeholder="Chapter名稱">`;
   }
-  if (type === 'guest' || type === 'observer') {
+  if (type === 'guest') {
     extra += '<label>邀請人</label><input type="text" id="pf-invited" value="'+esc(p.invited_by||'')+'" placeholder="邀請人名稱">';
   }
   if (type === 'guest') {
@@ -855,9 +910,9 @@ async function showPersonForm(type, editId) {
       body.role = document.getElementById('pf-role')?.value || '會員';
       body.bio = document.getElementById('pf-bio')?.value || '';
     }
-    if (type === 'guest' || type === 'observer') body.professional = document.getElementById('pf-prof')?.value || '';
+    if (type === 'guest') body.professional = document.getElementById('pf-prof')?.value || '';
     if (type === 'observer') body.chapter = document.getElementById('pf-chapter')?.value || '';
-    if (type === 'guest' || type === 'observer') body.invited_by = document.getElementById('pf-invited')?.value || '';
+    if (type === 'guest') body.invited_by = document.getElementById('pf-invited')?.value || '';
     if (type === 'guest') { body.meeting_id = document.getElementById('pf-meeting')?.value || null; }
 
     let result;
@@ -877,7 +932,7 @@ async function showPersonForm(type, editId) {
     hideModal(); toast(_savedId ? '已更新' : '已新增');
     await loadAllData();
     const el = document.getElementById('tbl-body');
-    if (el) renderTableBody(type, { member: members, guest: guests, observer: observers }[type]);
+    if (el) renderTableBody(type, { member: members, guest: guests,  }[type]);
   };
 }
 
@@ -887,7 +942,7 @@ async function deletePerson(type, id, name) {
   toast('已刪除');
   await loadAllData();
   const el = document.getElementById('tbl-body');
-  if (el) renderTableBody(type, { member: members, guest: guests, observer: observers }[type]);
+  if (el) renderTableBody(type, { member: members, guest: guests,  }[type]);
 }
 
 // ── Check-in Operation Page ───────────────────────
@@ -1079,16 +1134,28 @@ async function showCheckinPersonOps(type, pid, name) {
     }
     receiptHtml += '<div style="margin-top:6px"><input type="file" id="ci-receipt" accept="image/*" style="width:100%;font-size:12px;margin-bottom:4px"><button class="btn btn-sm btn-primary" style="width:100%" onclick="uploadCheckinReceipt('+pid+',\''+type+'\')">上傳憑證</button></div>';
   }
+  var isFree = att && att.payment === 'free';
   var curTbl = att ? esc(att.table_number||'') : '';
+  var payStatus = absent ? '✕ 缺席' : (isFree ? '🆓 免費' : (paid ? '✅ 已付' : '❌ 未付'));
+  var payColor = absent ? '#94a3b8' : (isFree ? '#3b82f6' : (paid ? '#10b981' : '#f59e0b'));
+  var payHtml = '';
+  if (!paid && !absent) {
+    payHtml = '<div style="margin:8px 0">'+
+      '<div style="background:#f0fdf4;border:1.5px solid #10b981;border-radius:8px;padding:10px;margin-bottom:6px">'+
+        '<div style="font-weight:700;font-size:12px;color:#10b981;margin-bottom:6px">📤 憑證付費</div>'+
+        '<input type="file" id="ci-receipt" accept="image/*" style="width:100%;font-size:11px;margin-bottom:4px">'+
+        '<button class="btn btn-sm" style="width:100%;background:#10b981;color:#fff" onclick="uploadCheckinReceipt('+pid+',\''+type+'\')">確認上傳憑證</button></div>'+
+      '<div style="display:flex;gap:6px;margin-bottom:6px">'+
+        '<button class="btn btn-sm" style="flex:1;background:#3b82f6;color:#fff" onclick="markCheckinPayment('+attId+',\'free\');hideModal()">🆓 免費</button>'+
+        '<button class="btn btn-sm" style="flex:1;background:#f59e0b;color:#fff" onclick="markCheckinPayment('+attId+',\'paid\');hideModal()">💵 現金</button>'+
+      '</div></div>';
+  }
   showModal('👤 '+esc(name), `
-    <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${absent?'✕ 缺席':(att?'簽到時間: '+esc(att.arrival_time||'—'):'尚未簽到')} · ${paid?'✅ 已付':'❌ 未付'}</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${absent?'✕ 缺席':(att?'簽到時間: '+esc(att.arrival_time||'—'):'尚未簽到')} · <span style="color:${payColor};font-weight:700">${payStatus}</span></div>
     <div style="margin-bottom:8px"><label style="font-size:11px;color:var(--text2)">枱號</label><input type="text" id="ci-table" value="${curTbl}" placeholder="枱號" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px"></div>
-    <div style="display:flex;gap:6px;margin-bottom:8px">
-      <button class="btn btn-sm btn-primary" style="flex:1" onclick="saveCheckinOps('${type}',${pid},${att?att.id:0})">💾 儲存</button>
-      <button class="btn btn-sm" style="flex:1;background:${paid?'#10b981':'#f59e0b'};color:#fff" onclick="togglePayOp('${type}',${pid});hideModal()">${paid?'✅ 已付':'💰 標記已付'}</button>
-    </div>
+    <button class="btn btn-sm btn-primary" style="width:100%;margin-bottom:6px" onclick="saveCheckinOps('${type}',${pid},${att?att.id:0})">💾 儲存枱號</button>
+    ${payHtml}
     <button class="btn btn-sm btn-outline" style="width:100%;margin-bottom:4px;color:#94a3b8" onclick="markAbsent('${type}',${pid},${absent?'false':'true'});hideModal()">${absent?'↩ 取消缺席':'✕ 標記缺席'}</button>
-    ${receiptHtml}
   `);
 }
 async function saveCheckinOps(type, pid, attId) {
@@ -1101,6 +1168,15 @@ async function saveCheckinOps(type, pid, attId) {
     hideModal();
     renderCheckinOpList();
   }
+}
+
+async function markCheckinPayment(attId, paymentType) {
+  if (!attId) return;
+  await api('/attendance', {method:'PUT',body:JSON.stringify({id:attId,payment:paymentType})});
+  var att = meetingAttendance.find(a => a.id === attId);
+  if (att) att.payment = paymentType;
+  toast(paymentType==='free'?'已標記為免費':'已標記現金付款');
+  renderCheckinOpList();
 }
 
 async function uploadCheckinReceipt(memberId, type) {
@@ -1313,8 +1389,8 @@ async function saveSettings() {
 
 // ── Helpers ───────────────────────────────────────
 async function loadAllData() {
-  const [m, g, o] = await Promise.all([api('/members'), api('/guests'), api('/observers')]);
-  members = m; guests = g; observers = o;
+  const [m, g] = await Promise.all([api('/members'), api('/guests')]);
+  members = m; guests = g;
 }
 
 async function api(path, opts = {}) {
@@ -1563,7 +1639,7 @@ function appendChatMsg(role, text) {
 
 // ── Person Ops Modal (table mode click) ────────────
 async function showPersonOps(type, pid) {
-  const list = {member:members, guest:guests, observer:observers}[type]||[];
+  const list = {member:members, guest:guests}[type]||[];
   const p = list.find(x => x.id === pid);
   if (!p) return;
   const att = meetingAttendance.find(a => a.person_type === type && a.person_id === pid);
@@ -1871,7 +1947,28 @@ async function createSkillToken() {
     var resp = await fetch('/api/skill-tokens', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name}) });
     var data = await resp.json();
     if (data.ok) {
-      toast('Token 已建立：' + data.token);
+      var curlExample = `curl -s -X POST "https://fotan.techforliving.net/api/skill" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "token": "${data.token}",
+    "action": "import_guests",
+    "guests": [
+      {"name": "陳大文", "professional": "律師", "payment": "paid"},
+      {"name": "李小華", "professional": "會計師", "payment": "unpaid"}
+    ]
+  }'`;
+      showModal('🔑 Token 已建立 — ' + esc(name), `
+        <div style="margin-bottom:12px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:4px">Token（請妥善保存）</div>
+          <code style="display:block;background:#f1f5f9;padding:8px 12px;border-radius:6px;font-size:12px;word-break:break-all;user-select:all">${esc(data.token)}</code>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">到期日：${esc(data.expires_at)}</div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:4px">📋 匯入嘉賓 curl 範例</div>
+          <pre style="background:#1e293b;color:#e2e8f0;padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;white-space:pre-wrap;user-select:all">${esc(curlExample)}</pre>
+        </div>
+        <p style="font-size:11px;color:var(--text2);margin-top:8px">🦞 支援 9 種操作：import_guests、update_payment、update_table、mark_arrival、search、meeting_stats、list_meetings、payment_summary、list_attendance</p>
+      `);
       loadSkillTokens();
     }
   } catch(e) { toast('建立失敗'); }
@@ -1885,7 +1982,7 @@ async function deleteSkillToken(id) {
 }
 
 function downloadSkill() {
-  var content = '---\nname: fotan-skill\ndescription: 火炭會龍蝦仔數據庫查詢\n---\n\n# 🦞 火炭會 Skill\n\n直接調用火炭會 Cloudflare D1 資料庫。\n\n## 驗證\n使用前需驗證 Token。調用 `/api/skill-tokens?action=verify&token=YOUR_TOKEN`\nToken 在後台「火炭會 Skill」頁面管理，有效期三個月。\n\n## 資料庫\n- D1: fotan-db\n- 指令: `npx wrangler d1 execute fotan-db --remote --command "<SQL>"`\n- 目錄: `/Users/perry/Documents/fotan`\n\n## 表格\nmembers (會員), guests (來賓), meetings (會議), attendance (出席), settings (設定)\n\n## 範例\n- 列出未付款人士\n- 查詢會議付款摘要\n- 搜尋會員聯絡資料\n';
+  var content = '---\nname: fotan-skill\ndescription: 火炭會聚會簽到系統完整 Skill — 查詢、匯入、付款、會議、統計、枱號\n---\n\n# 火炭會 Skill\n\n## Token 驗證\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n所有請求格式：`POST https://fotan.techforliving.net/api/skill` + JSON body，必須帶 `token` 同 `action`。\n\n---\n\n## 🌟 嘉賓名單匯入\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{\n    "token": "YOUR_TOKEN",\n    "action": "import_guests",\n    "guests": [\n      {"name": "陳大文", "professional": "律師", "payment": "paid"},\n      {"name": "李小華", "professional": "會計師", "payment": "unpaid"},\n      {"name": "張三", "professional": "工程師", "payment": "free"}\n    ]\n  }\'\n```\n\n| 欄位 | 說明 |\n|------|------|\n| `name` | 姓名（必填） |\n| `professional` | 專業（可選） |\n| `payment` | `paid` / `unpaid` / `free` |\n| `tel` | 電話（可選） |\n| `invited_by` | 邀請人（可選） |\n\n**規則：** 自動用最新會議、跳過會員/來賓重複、如係會員會更新其 attendance 付款狀態。\n\n---\n\n## 💰 更新付款狀態\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_payment", "attendance_id": 123, "payment": "paid"}\'\n```\n\n`payment` 值：`paid` / `free` / `unpaid`\n\n---\n\n## 🍽️ 更新枱號\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_table", "meeting_id": 10, "person_type": "member", "person_id": 26, "table_number": "5"}\'\n```\n\n---\n\n## ✅ 標記出席\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "mark_arrival", "attendance_id": 123, "arrival_time": "12:30"}\'\n```\n\n`arrival_time` 值：`HH:MM` 或 `absent`（缺席）\n\n---\n\n## 🔍 搜尋\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "search", "q": "陳"}\'\n```\n\n---\n\n## 📊 會議統計\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "meeting_stats"}\'\n```\n\n---\n\n## 💳 付款摘要\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "payment_summary"}\'\n```\n\n---\n\n## 📋 會議列表\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n---\n\n## 👥 出席名單\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_attendance"}\'\n```\n\n---\n\n## 🛠️ 手動 SQL（需要 Wrangler + Node.js）\n\n資料庫：D1 `fotan-db`\n```bash\nnpx wrangler d1 execute fotan-db --remote --command "<SQL>"\n```\n';
   var blob = new Blob([content], { type: 'text/markdown' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
