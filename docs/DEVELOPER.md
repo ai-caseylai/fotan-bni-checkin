@@ -65,9 +65,9 @@ members, guests, meetings(member_fee/committee_fee/guest_fee/early_bird_fee/walk
 | /backup | GET | JSON 備份 |
 | /image | GET | R2 圖片 |
 
-## Skill REST API（17 actions）
+## Skill REST API（18 actions）
 
-import_guests, bulk_create_members, create_member, update_member, update_guest, delete_person, search, update_payment, update_table, mark_arrival, list_meetings, meeting_stats, payment_summary, list_attendance, get_settings, export_stats, upload_image
+import_guests, bulk_create_members, create_member, update_member, update_guest, delete_person, search, update_payment, update_table, update_meeting, mark_arrival, list_meetings, meeting_stats, payment_summary, list_attendance, get_settings, export_stats, upload_image
 
 ## Chatbot Tools（21 個）
 

@@ -387,7 +387,7 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
     "type": "anniversary",
     "guest_fee": 398,
     "member_fee": 398,
-    "committee_fee": 298,
+    "committee_fee": 220,
     "total": 118,
     "members": 26,
     "guests": 92,

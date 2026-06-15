@@ -97,7 +97,7 @@
 
 | Tier | 判定 | 欄位 |
 |------|------|------|
-| 委員 | role != '會員' | committee_fee |
+| 委員 | role != '會員' | committee_fee（$220） |
 | 會員 | role = '會員' | member_fee |
 | 來賓 | person_type='guest' | guest_fee |
 | 早鳥 | price_tier='early_bird' | early_bird_fee |
