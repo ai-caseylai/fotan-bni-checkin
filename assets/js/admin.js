@@ -604,12 +604,12 @@ function showMeetingForm(editId) {
       <option value="anniversary" ${m.type==='anniversary'?'selected':''}>週年聚餐</option>
     </select>
     <label>收款人</label><input type="text" id="mt-collector" value="${esc(m.collector||'')}" placeholder="收款人名稱">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div><label>委員價</label><input type="number" id="mt-committee-fee" value="${m.committee_fee||''}" placeholder="388"></div>
-      <div><label>會員價</label><input type="number" id="mt-member-fee" value="${m.member_fee||''}" placeholder="388"></div>
-      <div><label>來賓價</label><input type="number" id="mt-guest-fee" value="${m.guest_fee||''}" placeholder="380"></div>
-      <div><label>早鳥價</label><input type="number" id="mt-early-fee" value="${m.early_bird_fee||''}" placeholder="350"></div>
-      <div><label>臨場價</label><input type="number" id="mt-walkin-fee" value="${m.walk_in_fee||''}" placeholder="420"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      <div><label style="font-size:11px">委員價</label><input type="number" id="mt-committee-fee" value="${m.committee_fee||''}" placeholder="388" style="font-size:14px;padding:8px"></div>
+      <div><label style="font-size:11px">會員價</label><input type="number" id="mt-member-fee" value="${m.member_fee||''}" placeholder="388" style="font-size:14px;padding:8px"></div>
+      <div><label style="font-size:11px">來賓價</label><input type="number" id="mt-guest-fee" value="${m.guest_fee||''}" placeholder="380" style="font-size:14px;padding:8px"></div>
+      <div><label style="font-size:11px">早鳥價</label><input type="number" id="mt-early-fee" value="${m.early_bird_fee||''}" placeholder="350" style="font-size:14px;padding:8px"></div>
+      <div><label style="font-size:11px">臨場價</label><input type="number" id="mt-walkin-fee" value="${m.walk_in_fee||''}" placeholder="420" style="font-size:14px;padding:8px"></div>
     </div>
     ${editId ? '' : '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="mt-add-members" checked style="width:18px;height:18px"> 複製上次會議的與會會員</label>'}
     <button class="btn btn-primary" style="width:100%" id="save-mt">${editId?'儲存':'新增會議'}</button>
@@ -1082,7 +1082,7 @@ function renderCheckinOpList() {
         const att = attMap[`${sec.key}_${p.id}`];
         const paid = att && att.payment && att.payment !== '' && att.payment !== 'unpaid';
         const absent = att && att.arrival_time === 'absent';
-        html += '<tr style="cursor:pointer;background:'+(absent?'#f8fafc':'')+'" onclick="showCheckinPersonOps(\''+sec.key+'\','+p.id+',\''+esc(p.name)+'\')">';
+        html += '<tr style="cursor:pointer;background:'+(absent?'#f8fafc':'')+'" onclick="autoArriveAndShow(\''+sec.key+'\','+p.id+',\''+esc(p.name)+'\')">';
         html += '<td style="padding:6px 8px"><div class="pc-av '+sec.key+'" style="width:22px;height:22px;font-size:10px;display:inline-flex">'+esc(p.name.charAt(0))+'</div></td>';
         html += '<td style="padding:6px 8px;font-weight:600;font-size:12px">'+esc(p.name)+'</td>';
         html += '<td style="padding:6px 8px;font-size:11px;color:var(--text2)">'+esc(p.tel||'—')+'</td>';
@@ -1091,10 +1091,9 @@ function renderCheckinOpList() {
           html += '<td style="padding:6px 8px"><span style="font-size:10px;color:#94a3b8">缺席</span></td>';
           html += '<td style="padding:6px 8px"><button class="btn btn-outline btn-sm" onclick="markAbsent(\''+sec.key+'\','+p.id+',false)" style="font-size:10px;padding:2px 6px">↩ 取消</button></td>';
         } else {
-          html += '<td style="padding:6px 8px"><span class="badge '+payClass(att?att.payment:'')+'" style="cursor:pointer;font-size:10px;padding:3px 6px" onclick="togglePayOp(\''+sec.key+'\','+p.id+')">'+payLabel(att?att.payment:'')+'</span></td>';
+          html += '<td style="padding:6px 8px"><span class="badge '+payClass(att?att.payment:'')+'" style="cursor:pointer;font-size:10px;padding:3px 6px" onclick="event.stopPropagation();showCheckinPersonOps(\''+sec.key+'\','+p.id+',\''+esc(p.name)+'\')">'+payLabel(att?att.payment:'')+'</span></td>';
           html += '<td style="padding:6px 8px"><div style="display:flex;gap:3px">';
-          html += '<button class="btn btn-outline btn-sm" onclick="setTimeOp(\''+sec.key+'\','+p.id+')" style="font-size:10px;padding:2px 6px">🕐</button>';
-          html += '<button class="btn btn-outline btn-sm" onclick="markAbsent(\''+sec.key+'\','+p.id+',true)" style="font-size:10px;padding:2px 5px;color:#94a3b8">✕</button>';
+          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();markAbsent(\''+sec.key+'\','+p.id+',true)" style="font-size:10px;padding:2px 5px;color:#94a3b8">✕</button>';
           html += '</div></td>';
         }
         html += '</tr>';
@@ -1109,7 +1108,7 @@ function renderCheckinOpList() {
         const att = attMap[`${sec.key}_${p.id}`];
         const paid = att && att.payment && att.payment !== '' && att.payment !== 'unpaid';
         const absent = att && att.arrival_time === 'absent';
-        html += '<div class="person-card'+(att?(absent?' absent':(paid?' has-att paid':' has-att unpaid')):'')+'" onclick="showCheckinPersonOps(\''+sec.key+'\','+p.id+',\''+esc(p.name)+'\')" style="cursor:pointer">';
+        html += '<div class="person-card'+(att?(absent?' absent':(paid?' has-att paid':' has-att unpaid')):'')+'" onclick="autoArriveAndShow(\''+sec.key+'\','+p.id+',\''+esc(p.name)+'\')" style="cursor:pointer">';
         html += '<div class="pc-av '+sec.key+'">'+esc(p.name.charAt(0))+'</div>';
         html += '<div class="pc-name">'+esc(p.name)+'</div>';
         if (p.tel) html += '<div class="pc-meta">📱 '+esc(p.tel)+'</div>';
@@ -1117,10 +1116,9 @@ function renderCheckinOpList() {
           html += '<div class="pc-row"><span style="font-size:12px;color:#94a3b8;font-weight:600">✕ 缺席</span>';
           html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();markAbsent(\''+sec.key+'\','+p.id+',false)" style="padding:2px 6px;font-size:10px">↩</button></div>';
         } else {
-          html += '<div class="pc-row">';
+          html += '<div class="pc-row" style="flex-wrap:wrap;gap:4px">';
           html += '<span class="pc-time">'+(att?.arrival_time||'—')+'</span>';
-          html += '<span class="badge '+payClass(att?att.payment:'')+'" style="cursor:pointer;font-size:11px;padding:4px 8px" onclick="event.stopPropagation();togglePayOp(\''+sec.key+'\','+p.id+')">'+payLabel(att?att.payment:'')+'</span>';
-          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();setTimeOp(\''+sec.key+'\','+p.id+')" style="padding:3px 8px;font-size:11px">🕐</button>';
+          html += '<span class="badge '+payClass(att?att.payment:'')+'" style="cursor:pointer;font-size:11px;padding:4px 8px" onclick="event.stopPropagation();showCheckinPersonOps(\''+sec.key+'\','+p.id+',\''+esc(p.name)+'\')">'+payLabel(att?att.payment:'')+'</span>';
           html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();markAbsent(\''+sec.key+'\','+p.id+',true)" style="padding:3px 6px;font-size:11px;color:#94a3b8">✕</button>';
           html += '</div>';
         }
@@ -1178,33 +1176,55 @@ function markAbsent(type, pid, absent) {
   }
   renderCheckinOpList();
 }
+async function autoArriveAndShow(type, pid, name) {
+  var att = getOrCreateOpAtt(type, pid);
+  if (!att.arrival_time || att.arrival_time === 'absent') {
+    var now = new Date();
+    att.arrival_time = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    // Save to server
+    if (att.id) {
+      await api('/attendance', {method:'PUT',body:JSON.stringify({id:att.id,arrival_time:att.arrival_time})});
+    }
+  }
+  renderCheckinOpList();
+  showCheckinPersonOps(type, pid, name);
+}
+
 async function showCheckinPersonOps(type, pid, name) {
   const att = meetingAttendance.find(a => a.person_type === type && a.person_id === pid);
   const paid = att && att.payment && att.payment !== '' && att.payment !== 'unpaid';
   const absent = att && att.arrival_time === 'absent';
+  // Load member receipts
   let receiptHtml = '';
   if (type === 'member') {
-    const receipts = await loadReceipts(pid);
-    if (receipts.length > 0) {
-      receiptHtml = '<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">'+receipts.map(r => '<a href="/api/receipts?id='+r.id+'" target="_blank"><img src="/api/receipts?id='+r.id+'" style="width:50px;height:50px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0"></a>').join('')+'</div>';
-    }
-    receiptHtml += '<div style="margin-top:6px"><input type="file" id="ci-receipt" accept="image/*" style="width:100%;font-size:12px;margin-bottom:4px"><button class="btn btn-sm btn-primary" style="width:100%" onclick="uploadCheckinReceipt('+pid+',\''+type+'\')">上傳憑證</button></div>';
+    try {
+      const receipts = await loadReceipts(pid);
+      if (receipts.length > 0) {
+        receiptHtml = '<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">'+receipts.map(r => '<a href="/api/receipts?id='+r.id+'" target="_blank"><img src="/api/receipts?id='+r.id+'" style="width:50px;height:50px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0"></a>').join('')+'</div>';
+      }
+    } catch(e) {}
   }
   var isFree = att && att.payment === 'free';
   var curTbl = att ? esc(att.table_number||'') : '';
   var payStatus = absent ? '✕ 缺席' : (isFree ? '🆓 免費' : (paid ? '✅ 已付' : '❌ 未付'));
   var payColor = absent ? '#94a3b8' : (isFree ? '#3b82f6' : (paid ? '#10b981' : '#f59e0b'));
   var payHtml = '';
-  if (!paid && !absent) {
-    payHtml = '<div style="margin:8px 0">'+
-      '<div style="background:#f0fdf4;border:1.5px solid #10b981;border-radius:8px;padding:10px;margin-bottom:6px">'+
-        '<div style="font-weight:700;font-size:12px;color:#10b981;margin-bottom:6px">📤 憑證付費</div>'+
-        '<input type="file" id="ci-receipt" accept="image/*" style="width:100%;font-size:11px;margin-bottom:4px">'+
-        '<button class="btn btn-sm" style="width:100%;background:#10b981;color:#fff" onclick="uploadCheckinReceipt('+pid+',\''+type+'\')">確認上傳憑證</button></div>'+
-      '<div style="display:flex;gap:6px;margin-bottom:6px">'+
-        '<button class="btn btn-sm" style="flex:1;background:#3b82f6;color:#fff" onclick="markCheckinPayment('+attId+',\'free\');hideModal()">🆓 免費</button>'+
-        '<button class="btn btn-sm" style="flex:1;background:#f59e0b;color:#fff" onclick="markCheckinPayment('+attId+',\'paid\');hideModal()">💵 現金</button>'+
-      '</div></div>';
+  var attId = att ? att.id : 0;
+  if (!absent) {
+    payHtml = '<div style="margin:8px 0"><div style="font-weight:700;font-size:12px;color:var(--text2);margin-bottom:6px">💳 付款操作</div>';
+    // Receipt upload
+    payHtml += '<div style="background:#f0fdf4;border:1.5px solid #10b981;border-radius:8px;padding:10px;margin-bottom:6px">'+
+      '<div style="font-weight:700;font-size:12px;color:#10b981;margin-bottom:4px">📤 憑證付費</div>'+
+      '<input type="file" id="ci-receipt" accept="image/*" style="width:100%;font-size:11px;margin-bottom:4px">'+
+      '<button class="btn btn-sm" style="width:100%;background:#10b981;color:#fff" onclick="uploadCheckinReceipt('+pid+',\''+type+'\')">確認上傳憑證</button></div>';
+    // Cash + Free buttons
+    payHtml += '<div style="display:flex;gap:6px;margin-bottom:6px">'+
+      '<button class="btn btn-sm" style="flex:1;background:#f59e0b;color:#fff;font-size:13px;font-weight:700" onclick="markCheckinPayment('+attId+',\'paid\');hideModal()">💵 現金付款</button>'+
+      '<button class="btn btn-sm" style="flex:1;background:#3b82f6;color:#fff;font-size:13px;font-weight:700" onclick="markCheckinPayment('+attId+',\'free\');hideModal()">🆓 免費</button>'+
+    '</div>';
+    // Show current receipts if any
+    if (receiptHtml) payHtml += receiptHtml;
+    payHtml += '</div>';
   }
   showModal('👤 '+esc(name), `
     <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${absent?'✕ 缺席':(att?'簽到時間: '+esc(att.arrival_time||'—'):'尚未簽到')} · <span style="color:${payColor};font-weight:700">${payStatus}</span></div>
@@ -1224,6 +1244,44 @@ async function saveCheckinOps(type, pid, attId) {
     hideModal();
     renderCheckinOpList();
   }
+}
+
+async function quickCashPay(type, pid) {
+  const att = getOrCreateOpAtt(type, pid);
+  if (att.id) {
+    await api('/attendance', {method:'PUT',body:JSON.stringify({id:att.id,payment:'paid',payment_method:''})});
+    att.payment = 'paid'; att.payment_method = '';
+  } else {
+    att.payment = 'paid';
+  }
+  toast('💵 已標記現金付款');
+  renderCheckinOpList();
+}
+async function quickReceiptPay(type, pid, name) {
+  showModal('📤 憑證付費 · '+esc(name), `
+    <input type="file" id="quick-receipt" accept="image/*" style="width:100%;font-size:14px;margin-bottom:8px">
+    <button class="btn btn-sm" style="width:100%;background:#10b981;color:#fff;font-size:14px;padding:10px" onclick="uploadQuickReceipt('${type}',${pid})">確認上傳憑證</button>
+  `);
+}
+async function uploadQuickReceipt(type, pid) {
+  const file = document.getElementById('quick-receipt')?.files[0];
+  if (!file) { toast('請選擇檔案'); return; }
+  var att = meetingAttendance.find(a => a.person_type === type && a.person_id === pid);
+  const reader = new FileReader();
+  reader.onload = async () => {
+    if (att && att.id) {
+      await api('/checkin-upload', {method:'POST',body:JSON.stringify({attendance_id:att.id,data:reader.result})});
+      att.payment = 'paid'; att.payment_method = 'receipt_uploaded';
+    } else {
+      var memberId = pid;
+      await api('/receipts', {method:'POST',body:JSON.stringify({member_id:memberId,filename:file.name,data:reader.result})});
+      if (att) { att.payment = 'paid'; att.payment_method = 'receipt_uploaded'; }
+    }
+    toast('✅ 憑證已上傳，已標記付款');
+    hideModal();
+    renderCheckinOpList();
+  };
+  reader.readAsDataURL(file);
 }
 
 async function markCheckinPayment(attId, paymentType) {

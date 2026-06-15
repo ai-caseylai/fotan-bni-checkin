@@ -244,8 +244,9 @@ body {
   padding: 24px;
   width: 90%;
   max-width: 480px;
-  max-height: 80vh;
+  max-height: 90vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2);
 }
 .modal-dialog h3 { font-size: 17px; margin-bottom: 16px; }
