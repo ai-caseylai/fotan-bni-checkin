@@ -100,54 +100,65 @@ async function renderOverview(pc) {
   try {
     const stats = await api('/stats');
     const mts = await api('/meetings');
+    const current = mts[0] || {};
+    var detail = current.id ? await api('/meetings?id='+current.id) : null;
+    var att = detail ? detail.attendance || [] : [];
+    var paidCount = att.filter(function(a){return a.payment==='paid'||a.payment==='free'}).length;
+    var unpaidCount = att.filter(function(a){return !a.payment||a.payment==='unpaid'}).length;
+    var memberCount = att.filter(function(a){return a.person_type==='member'}).length;
+    var guestCount = att.filter(function(a){return a.person_type==='guest'}).length;
+    var arrivedCount = att.filter(function(a){return a.arrival_time&&a.arrival_time!=='absent'}).length;
+    var revenue = current.stats?.revenue || stats.revenue || 0;
+    var lunchFee = current.member_fee || 388;
+    var guestFee = current.guest_fee || 380;
+
     pc.innerHTML = `
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-header">
+        <h2>📅 ${current.date||'—'} · ${mLblText(current.type||'regular')}</h2>
+        <button class="btn btn-primary btn-sm" onclick="switchPage('meetings')">管理會議</button>
+      </div>
+    </div>
     <div class="stat-grid">
-      <div class="stat-card"><div class="n">${stats.total_meetings||0}</div><div class="l">總會議次數</div></div>
-      <div class="stat-card"><div class="n">${stats.member_count||0}</div><div class="l">會員人數</div></div>
-      <div class="stat-card"><div class="n">${stats.total_attendance||0}</div><div class="l">總出席記錄</div></div>
-      <div class="stat-card"><div class="n">${stats.paid_count||0}</div><div class="l">已付款次數</div></div>
-      <div class="stat-card"><div class="n" style="color:#10b981">$${(stats.revenue||0).toLocaleString()}</div><div class="l">💰 總收入</div></div>
+      <div class="stat-card"><div class="n">${att.length}</div><div class="l">👥 總出席人數</div></div>
+      <div class="stat-card"><div class="n">${memberCount}</div><div class="l">會員</div></div>
+      <div class="stat-card"><div class="n">${guestCount}</div><div class="l">來賓</div></div>
+      <div class="stat-card"><div class="n">${arrivedCount}</div><div class="l">✅ 已簽到</div></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="n">${paidCount}</div><div class="l">💰 已收人數</div></div>
+      <div class="stat-card"><div class="n">${unpaidCount}</div><div class="l">⚠️ 未收人數</div></div>
+      <div class="stat-card"><div class="n" style="font-size:22px">會員 $${lunchFee} · 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
+      <div class="stat-card"><div class="n" style="color:#10b981;font-size:28px">$${revenue.toLocaleString()}</div><div class="l">💰 預計總收入</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="panel">
-        <div class="panel-header"><h2>📈 出席趨勢</h2></div>
-        <div class="panel-body" style="position:relative;height:260px"><canvas id="chart-trend"></canvas></div>
+        <div class="panel-header"><h2>💰 付款分佈</h2></div>
+        <div class="panel-body" style="position:relative;height:220px"><canvas id="chart-payment"></canvas></div>
       </div>
       <div class="panel">
-        <div class="panel-header"><h2>💰 付款分佈</h2></div>
-        <div class="panel-body" style="position:relative;height:260px"><canvas id="chart-payment"></canvas></div>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-header">
-        <h2>最近會議</h2>
-        <div style="display:flex;gap:8px;align-items:center">
-          <select id="ov-filter" onchange="filterOverview()" style="padding:5px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;background:#fff">
-            <option value="all">📋 所有記錄</option>
-            <option value="unpaid">💰 未收費</option>
-            <option value="paid">✅ 已收費</option>
-          </select>
-          <button class="btn btn-sm btn-outline" onclick="exportOverviewCSV()" style="font-size:11px">📥 摘要</button>
-          <button class="btn btn-sm btn-outline" onclick="exportDetailCSV()" style="font-size:11px">📋 詳細</button>
-          <button class="btn btn-primary btn-sm" onclick="switchPage('meetings')">查看全部</button>
+        <div class="panel-header"><h2>📊 收入摘要</h2></div>
+        <div class="panel-body" style="padding:16px">
+          <div style="font-size:13px;line-height:2">
+            <div>👥 會員 (${memberCount}人 × $${lunchFee}) = <strong>$${(memberCount*lunchFee).toLocaleString()}</strong></div>
+            <div>👤 來賓 (${guestCount}人 × $${guestFee}) = <strong>$${(guestCount*guestFee).toLocaleString()}</strong></div>
+            <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px">💰 已收 (${paidCount}人) = <strong style="color:#10b981">$${revenue.toLocaleString()}</strong></div>
+            <div>⚠️ 未收 (${unpaidCount}人) ≈ <strong style="color:#f59e0b">$${((unpaidCount*lunchFee).toLocaleString())}</strong></div>
+          </div>
         </div>
       </div>
-      <div class="panel-body">
-        <table class="data-table">
-          <thead><tr><th></th><th>日期</th><th>類型</th><th>收款人</th><th>收入</th></tr></thead>
-          <tbody>${mts.slice(0,20).map(m => `<tr class="expand-tr" onclick="toggleOverviewMeeting(${m.id})">
-            <td><span class="arrow">▶</span></td>
-            <td><strong>${m.date}</strong></td>
-            <td>${mLblText(m.type)}</td>
-            <td>${esc(m.collector||'-')}</td>
-            <td style="color:#10b981;font-weight:600">$${(m.stats?.revenue||0).toLocaleString()}</td>
-          </tr>
-          <tr class="detail-row" id="ov-att-${m.id}"><td colspan="5"></td></tr>`).join('')}</tbody>
-        </table>
-        ${mts.length===0 ? '<div class="empty">暫無會議</div>' : ''}
-      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" onclick="exportOverviewCSV()">📥 匯出摘要</button>
+      <button class="btn btn-outline btn-sm" onclick="exportDetailCSV()">📋 匯出詳細</button>
+      <button class="btn btn-primary btn-sm" onclick="switchPage('checkin')">✅ 開始簽到</button>
     </div>`;
-    renderOverviewCharts(mts);
+    // Payment chart
+    var ctx = document.getElementById('chart-payment');
+    if (ctx) {
+      Chart.getChart(ctx)?.destroy();
+      new Chart(ctx, { type: 'doughnut', data: { labels: ['已收','免費','未收'], datasets: [{ data: [att.filter(function(a){return a.payment==='paid'}).length, att.filter(function(a){return a.payment==='free'}).length, unpaidCount], backgroundColor: ['#10b981','#3b82f6','#f59e0b'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+    }
   } catch(e) {
     pc.innerHTML = '<div class="empty">載入失敗：'+esc(e.message)+'</div>';
   }
