@@ -34,12 +34,13 @@ export async function onRequest(context) {
                 WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m2.early_bird_fee,0), 388)
                 WHEN a.price_tier='walk_in' THEN COALESCE(NULLIF(m2.walk_in_fee,0), 388)
                 WHEN a.price_tier='committee' THEN COALESCE(NULLIF(m2.committee_fee,0), 388)
+                WHEN a.person_type='member' AND mem.role IS NOT NULL AND mem.role != '會員' THEN COALESCE(NULLIF(m2.committee_fee,0), 220)
                 WHEN a.person_type='guest' THEN COALESCE(NULLIF(m2.guest_fee,0), 388)
                 WHEN a.person_type='member' THEN COALESCE(NULLIF(m2.member_fee,0), 388)
                 ELSE COALESCE(NULLIF(m2.member_fee,0), 388)
               END
             ELSE 0 END) as revenue
-          FROM attendance a JOIN meetings m2 ON a.meeting_id=m2.id WHERE a.meeting_id=?`
+          FROM attendance a JOIN meetings m2 ON a.meeting_id=m2.id LEFT JOIN members mem ON a.person_type='member' AND a.person_id=mem.id WHERE a.meeting_id=?`
         ).bind(m.id).first();
         m.stats = stats;
       }

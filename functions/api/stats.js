@@ -38,12 +38,13 @@ export async function onRequest(context) {
             WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m.early_bird_fee,0), 388)
             WHEN a.price_tier='walk_in' THEN COALESCE(NULLIF(m.walk_in_fee,0), 388)
             WHEN a.price_tier='committee' THEN COALESCE(NULLIF(m.committee_fee,0), 388)
+            WHEN a.person_type='member' AND mem.role IS NOT NULL AND mem.role != '會員' THEN COALESCE(NULLIF(m.committee_fee,0), 220)
             WHEN a.person_type='guest' THEN COALESCE(NULLIF(m.guest_fee,0), 388)
             WHEN a.person_type='member' THEN COALESCE(NULLIF(m.member_fee,0), 388)
             ELSE COALESCE(NULLIF(m.member_fee,0), 388)
           END
         ELSE 0 END) as total
-        FROM attendance a JOIN meetings m ON a.meeting_id=m.id WHERE a.meeting_id=?`
+        FROM attendance a JOIN meetings m ON a.meeting_id=m.id LEFT JOIN members mem ON a.person_type='member' AND a.person_id=mem.id WHERE a.meeting_id=?`
       ).bind(latest.id).first();
       revenue = revRow?.total || 0;
     }

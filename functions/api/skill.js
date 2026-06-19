@@ -94,12 +94,25 @@ export async function onRequest(context) {
 
     // ── update_table ────────────────────────────────
     if (action === 'update_table') {
-      const { meeting_id, person_id, person_type, table_number } = body;
+      const { meeting_id, person_id, person_type, table_number, seat_order } = body;
       if (!meeting_id || !person_id || !person_type) return Response.json({ ok: false, error: 'meeting_id, person_id, person_type required' }, { headers: cors });
+      if (!['member','guest'].includes(person_type)) return Response.json({ ok: false, error: 'person_type must be member or guest' }, { headers: cors });
+      const sets = [], vals = [];
+      if (table_number !== undefined) { sets.push('table_number=?'); vals.push(table_number || ''); }
+      if (seat_order !== undefined) { sets.push('seat_order=?'); vals.push(seat_order); }
+      if (!sets.length) return Response.json({ ok: false, error: 'table_number or seat_order required' }, { headers: cors });
+      vals.push(meeting_id, person_type, person_id);
       await env.DB.prepare(
-        'UPDATE attendance SET table_number=? WHERE meeting_id=? AND person_type=? AND person_id=?'
-      ).bind(table_number || '', meeting_id, person_type, person_id).run();
-      return Response.json({ ok: true, message: `已更新 ${person_type} #${person_id} 枱號為 ${table_number || '（清除）'}` }, { headers: cors });
+        'UPDATE attendance SET ' + sets.join(',') + ' WHERE meeting_id=? AND person_type=? AND person_id=?'
+      ).bind(...vals).run();
+      // Sync to person default table_number + seat_order
+      const personSets = [], personVals = [];
+      if (table_number !== undefined) { personSets.push('table_number=?'); personVals.push(table_number || ''); }
+      if (seat_order !== undefined) { personSets.push('seat_order=?'); personVals.push(seat_order); }
+      personVals.push(person_id);
+      const personTable = person_type === 'member' ? 'members' : 'guests';
+      await env.DB.prepare(`UPDATE ${personTable} SET ${personSets.join(',')} WHERE id=?`).bind(...personVals).run();
+      return Response.json({ ok: true, message: `已更新 ${person_type} #${person_id} 枱號/座位` }, { headers: cors });
     }
 
     // ── mark_arrival ────────────────────────────────
@@ -155,12 +168,13 @@ export async function onRequest(context) {
               WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m.early_bird_fee,0), 388)
               WHEN a.price_tier='walk_in' THEN COALESCE(NULLIF(m.walk_in_fee,0), 388)
               WHEN a.price_tier='committee' THEN COALESCE(NULLIF(m.committee_fee,0), 388)
+              WHEN a.person_type='member' AND mem.role IS NOT NULL AND mem.role != '會員' THEN COALESCE(NULLIF(m.committee_fee,0), 220)
               WHEN a.person_type='guest' THEN COALESCE(NULLIF(m.guest_fee,0), 388)
               WHEN a.person_type='member' THEN COALESCE(NULLIF(m.member_fee,0), 388)
               ELSE COALESCE(NULLIF(m.member_fee,0), 388)
             END
           ELSE 0 END) as revenue
-        FROM meetings m LEFT JOIN attendance a ON m.id=a.meeting_id
+        FROM meetings m LEFT JOIN attendance a ON m.id=a.meeting_id LEFT JOIN members mem ON a.person_type='member' AND a.person_id=mem.id
         WHERE m.id=? GROUP BY m.id
       `).bind(mid).first();
       return Response.json({ ok: true, stats }, { headers: cors });
@@ -213,7 +227,7 @@ export async function onRequest(context) {
       }
       if (!mid) return Response.json({ ok: false, error: 'no meeting found' }, { headers: cors });
       const rows = await env.DB.prepare(`
-        SELECT a.id, a.person_type, a.person_id, a.arrival_time, a.payment, a.table_number,
+        SELECT a.id, a.person_type, a.person_id, a.arrival_time, a.payment, a.table_number, a.seat_order,
           CASE WHEN a.person_type='member' THEN m.name ELSE g.name END as name,
           CASE WHEN a.person_type='member' THEN m.professional ELSE g.professional END as professional
         FROM attendance a
@@ -239,11 +253,11 @@ export async function onRequest(context) {
 
     // ── update_member ───────────────────────────────
     if (action === 'update_member') {
-      const { member_id, name, tel, email, professional, role, fee_paid_date, bio } = body;
+      const { member_id, name, tel, email, professional, role, fee_paid_date, bio, tags, table_number, seat_order, active } = body;
       if (!member_id) return Response.json({ ok: false, error: 'member_id required' }, { headers: cors });
       const fields = [];
       const values = [];
-      for (const f of ['name','tel','email','professional','role','fee_paid_date','bio']) {
+      for (const f of ['name','tel','email','professional','role','fee_paid_date','bio','tags','table_number','seat_order','active']) {
         const v = body[f];
         if (v !== undefined) { fields.push(f+'=?'); values.push(v); }
       }
@@ -255,11 +269,11 @@ export async function onRequest(context) {
 
     // ── update_guest ────────────────────────────────
     if (action === 'update_guest') {
-      const { guest_id, name, professional, tel, invited_by, meeting_id } = body;
+      const { guest_id, name, professional, tel, invited_by, meeting_id, vip, table_number, seat_order, active } = body;
       if (!guest_id) return Response.json({ ok: false, error: 'guest_id required' }, { headers: cors });
       const fields = [];
       const values = [];
-      for (const f of ['name','professional','tel','invited_by','meeting_id']) {
+      for (const f of ['name','professional','tel','invited_by','meeting_id','vip','table_number','seat_order','active']) {
         const v = body[f];
         if (v !== undefined) { fields.push(f+'=?'); values.push(v); }
       }
@@ -343,7 +357,424 @@ export async function onRequest(context) {
       return Response.json({ ok: true, url: `/api/image?name=${encodeURIComponent(name)}`, message: '已上傳圖片：' + name }, { headers: cors });
     }
 
-    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, payment_summary, list_attendance, create_member, update_member, update_guest, delete_person, get_settings, export_stats, bulk_create_members, upload_image` }, { headers: cors });
+    // ── delete_attendance ───────────────────────────
+    if (action === 'delete_attendance') {
+      const { attendance_id } = body;
+      if (!attendance_id) return Response.json({ ok: false, error: 'attendance_id required' }, { headers: cors });
+      await env.DB.prepare('DELETE FROM attendance WHERE id=?').bind(attendance_id).run();
+      return Response.json({ ok: true, message: '已刪除 attendance #' + attendance_id }, { headers: cors });
+    }
+
+    // ── delete_attendance_batch ──────────────────────
+    if (action === 'delete_attendance_batch') {
+      const { ids } = body;
+      if (!ids || !Array.isArray(ids) || !ids.length) return Response.json({ ok: false, error: 'ids array required' }, { headers: cors });
+      let deleted = 0;
+      for (const id of ids) {
+        await env.DB.prepare('DELETE FROM attendance WHERE id=?').bind(id).run();
+        deleted++;
+      }
+      return Response.json({ ok: true, message: '已刪除 ' + deleted + ' 條 attendance records', deleted }, { headers: cors });
+    }
+
+    // ── delete_meeting ────────────────────────────────
+    if (action === 'delete_meeting') {
+      const { meeting_id } = body;
+      if (!meeting_id) return Response.json({ ok: false, error: 'meeting_id required' }, { headers: cors });
+      await env.DB.prepare('DELETE FROM attendance WHERE meeting_id=?').bind(meeting_id).run();
+      await env.DB.prepare('DELETE FROM meetings WHERE id=?').bind(meeting_id).run();
+      return Response.json({ ok: true, message: '已刪除會議 #' + meeting_id + ' 及其所有出席記錄' }, { headers: cors });
+    }
+
+    // ── create_meeting ───────────────────────────────
+    if (action === 'create_meeting') {
+      const { date, type, collector, guest_fee, member_fee, committee_fee, early_bird_fee, walk_in_fee } = body;
+      if (!date) return Response.json({ ok: false, error: 'date required' }, { headers: cors });
+      const result = await env.DB.prepare(
+        'INSERT INTO meetings (date, type, collector, guest_fee, member_fee, committee_fee, early_bird_fee, walk_in_fee) VALUES (?,?,?,?,?,?,?,?)'
+      ).bind(date, type || 'regular', collector || '', guest_fee || 0, member_fee || 0, committee_fee || 0, early_bird_fee || 0, walk_in_fee || 0).run();
+      return Response.json({ ok: true, meeting_id: result.meta.last_row_id, message: '已建立會議：' + date }, { headers: cors });
+    }
+
+    // ── update_settings ──────────────────────────────
+    if (action === 'update_settings') {
+      const { settings } = body;
+      if (!settings || typeof settings !== 'object') return Response.json({ ok: false, error: 'settings object required' }, { headers: cors });
+      const stmts = [];
+      for (const [k, v] of Object.entries(settings)) {
+        stmts.push(env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?').bind(k, String(v), String(v)));
+      }
+      await env.DB.batch(stmts);
+      return Response.json({ ok: true, message: '已更新 ' + Object.keys(settings).length + ' 項設定' }, { headers: cors });
+    }
+
+    // ── create_guest ──────────────────────────────────
+    if (action === 'create_guest') {
+      const { name, professional, tel, invited_by, meeting_id, vip, payment } = body;
+      if (!name) return Response.json({ ok: false, error: 'name required' }, { headers: cors });
+      const existG = await env.DB.prepare('SELECT id FROM guests WHERE name=? AND active=1').bind(name).first();
+      const existM = await env.DB.prepare('SELECT id FROM members WHERE name=? AND active=1').bind(name).first();
+      if (existG || existM) return Response.json({ ok: false, error: '已存在：' + name }, { headers: cors });
+      let mid = meeting_id;
+      if (!mid) { const latest = await env.DB.prepare('SELECT id FROM meetings ORDER BY date DESC LIMIT 1').first(); mid = latest ? latest.id : null; }
+      const result = await env.DB.prepare(
+        'INSERT INTO guests (name, professional, tel, invited_by, meeting_id, vip) VALUES (?,?,?,?,?,?)'
+      ).bind(name, professional || '', tel || '', invited_by || '', mid, vip ? 1 : 0).run();
+      const guestId = result.meta.last_row_id;
+      if (mid) {
+        await env.DB.prepare('INSERT INTO attendance (meeting_id, person_type, person_id, payment) VALUES (?,?,?,?)')
+          .bind(mid, 'guest', guestId, payment || '').run();
+      }
+      return Response.json({ ok: true, guest_id: guestId, meeting_id: mid, message: '已新增來賓：' + name }, { headers: cors });
+    }
+
+    // ── add_to_meeting ────────────────────────────────
+    if (action === 'add_to_meeting') {
+      const { meeting_id, person_type, person_id, payment, table_number, seat_order } = body;
+      if (!person_type || !person_id) return Response.json({ ok: false, error: 'person_type and person_id required' }, { headers: cors });
+      let mid = meeting_id;
+      if (!mid) { const latest = await env.DB.prepare('SELECT id FROM meetings ORDER BY date DESC LIMIT 1').first(); mid = latest ? latest.id : null; }
+      if (!mid) return Response.json({ ok: false, error: 'no meeting found' }, { headers: cors });
+      // Check if already in meeting
+      const exist = await env.DB.prepare('SELECT id FROM attendance WHERE meeting_id=? AND person_type=? AND person_id=?').bind(mid, person_type, person_id).first();
+      if (exist) return Response.json({ ok: false, error: '此人已在此會議中 (attendance #' + exist.id + ')' }, { headers: cors });
+      // Verify person exists
+      if (person_type === 'member') {
+        const m = await env.DB.prepare('SELECT id FROM members WHERE id=? AND active=1').bind(person_id).first();
+        if (!m) return Response.json({ ok: false, error: '會員 #' + person_id + ' 不存在' }, { headers: cors });
+      } else {
+        const g = await env.DB.prepare('SELECT id FROM guests WHERE id=? AND active=1').bind(person_id).first();
+        if (!g) return Response.json({ ok: false, error: '來賓 #' + person_id + ' 不存在' }, { headers: cors });
+      }
+      const result = await env.DB.prepare(
+        'INSERT INTO attendance (meeting_id, person_type, person_id, payment, table_number, seat_order) VALUES (?,?,?,?,?,?)'
+      ).bind(mid, person_type, person_id, payment || '', table_number || '', seat_order ?? null).run();
+      return Response.json({ ok: true, attendance_id: result.meta.last_row_id, message: '已加入會議 #' + mid + '（' + person_type + ' #' + person_id + '）' }, { headers: cors });
+    }
+
+    // ── list_members ──────────────────────────────────
+    if (action === 'list_members') {
+      const rows = await env.DB.prepare('SELECT * FROM members WHERE active=1 ORDER BY id').all();
+      return Response.json({ ok: true, members: rows.results, count: rows.results.length }, { headers: cors });
+    }
+
+    // ── list_guests ───────────────────────────────────
+    if (action === 'list_guests') {
+      const rows = await env.DB.prepare('SELECT * FROM guests WHERE active=1 ORDER BY id').all();
+      return Response.json({ ok: true, guests: rows.results, count: rows.results.length }, { headers: cors });
+    }
+
+    // ═══════════════════════════════════════════════════
+    // 🍽  Table Management API
+    // ═══════════════════════════════════════════════════
+
+    // ── list_tables ──────────────────────────────────
+    if (action === 'list_tables') {
+      const { meeting_id } = body;
+      let mid = meeting_id;
+      if (!mid) {
+        const latest = await env.DB.prepare('SELECT id, date, type FROM meetings ORDER BY date DESC LIMIT 1').first();
+        if (!latest) return Response.json({ ok: false, error: 'no meeting found' }, { headers: cors });
+        mid = latest.id;
+      }
+      const meeting = await env.DB.prepare('SELECT id, date, type FROM meetings WHERE id=?').bind(mid).first();
+      // Get all attendance with person info
+      const rows = await env.DB.prepare(`
+        SELECT a.id as att_id, a.person_type, a.person_id, a.payment, a.table_number, a.seat_order,
+          a.arrival_time, a.substitute, a.remark,
+          CASE WHEN a.person_type='member' THEN m.name ELSE g.name END as name,
+          CASE WHEN a.person_type='member' THEN m.professional ELSE g.professional END as professional,
+          CASE WHEN a.person_type='member' THEN (m.role IS NOT NULL AND m.role != '會員') ELSE 0 END as is_committee,
+          CASE WHEN a.person_type='guest' THEN g.vip ELSE 0 END as vip,
+          CASE WHEN a.person_type='member' THEN m.tags ELSE '' END as tags
+        FROM attendance a
+        LEFT JOIN members m ON a.person_type='member' AND a.person_id=m.id
+        LEFT JOIN guests g ON a.person_type='guest' AND a.person_id=g.id
+        WHERE a.meeting_id=?
+        ORDER BY CAST(a.table_number AS INTEGER), a.table_number, a.seat_order
+      `).bind(mid).all();
+
+      // Load table names from settings
+      const settingRow = await env.DB.prepare(
+        "SELECT value FROM settings WHERE key=?"
+      ).bind('seating_names_' + mid).first();
+      let tableNames = {};
+      if (settingRow) {
+        try { tableNames = JSON.parse(settingRow.value); } catch(e) {}
+      }
+
+      // Load table count from settings
+      const countRow = await env.DB.prepare(
+        "SELECT value FROM settings WHERE key=?"
+      ).bind('seating_table_count_' + mid).first();
+      const tableCount = countRow ? parseInt(countRow.value) || 0 : 0;
+
+      // Build table map
+      const tables = {}; // key -> {name, people:[]}
+      const unassigned = [];
+      for (const a of rows.results) {
+        const tbl = a.table_number || '';
+        if (!tbl) {
+          unassigned.push(a);
+          continue;
+        }
+        if (!tables[tbl]) tables[tbl] = { table_number: tbl, name: tableNames[tbl] || ('第 ' + tbl + ' 號枱'), people: [] };
+        tables[tbl].people.push(a);
+      }
+      // Include empty tables within configured count
+      const existingNums = Object.keys(tables).map(Number);
+      const maxDataTbl = existingNums.length ? Math.max(...existingNums) : 0;
+      const effectiveCount = Math.max(maxDataTbl, tableCount, 0);
+      for (let i = 1; i <= effectiveCount; i++) {
+        const k = String(i);
+        if (!tables[k]) tables[k] = { table_number: k, name: tableNames[k] || ('第 ' + k + ' 號枱'), people: [] };
+      }
+
+      const tableList = Object.keys(tables).sort((a,b) => parseInt(a)-parseInt(b)).map(k => tables[k]);
+      const totalPeople = rows.results.length;
+      const assignedPeople = totalPeople - unassigned.length;
+
+      return Response.json({
+        ok: true,
+        meeting_id: mid,
+        meeting_date: meeting.date,
+        meeting_type: meeting.type,
+        table_count: tableList.length,
+        total_people: totalPeople,
+        assigned_people: assignedPeople,
+        unassigned_people: unassigned.length,
+        tables: tableList,
+        unassigned
+      }, { headers: cors });
+    }
+
+    // ── update_table_names ───────────────────────────
+    if (action === 'update_table_names') {
+      const { meeting_id, names } = body;
+      if (!meeting_id) return Response.json({ ok: false, error: 'meeting_id required' }, { headers: cors });
+      if (!names || typeof names !== 'object') return Response.json({ ok: false, error: 'names object required, e.g. {"1":"VIP枱","2":"主家席"}' }, { headers: cors });
+      const key = 'seating_names_' + meeting_id;
+      const value = JSON.stringify(names);
+      await env.DB.prepare(
+        'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?'
+      ).bind(key, value, value).run();
+      return Response.json({
+        ok: true,
+        message: '已更新 ' + Object.keys(names).length + ' 張枱名稱',
+        table_names: names
+      }, { headers: cors });
+    }
+
+    // ── auto_seat ────────────────────────────────────
+    if (action === 'auto_seat') {
+      const { group, meeting_id, table_number: targetTbl, surname, tag, max_per_table } = body;
+      if (!group) return Response.json({ ok: false, error: 'group required: committee/vip/member/guest/surname/tag' }, { headers: cors });
+      let mid = meeting_id;
+      if (!mid) {
+        const latest = await env.DB.prepare('SELECT id, date, type FROM meetings ORDER BY date DESC LIMIT 1').first();
+        if (!latest) return Response.json({ ok: false, error: 'no meeting found' }, { headers: cors });
+        mid = latest.id;
+      }
+      const meeting = await env.DB.prepare('SELECT id, date, type FROM meetings WHERE id=?').bind(mid).first();
+      const maxPerTable = parseInt(max_per_table) || 12;
+
+      // Get all attendance for this meeting
+      const att = await env.DB.prepare(`
+        SELECT a.id as att_id, a.person_type, a.person_id, a.table_number, a.payment,
+          CASE WHEN a.person_type='member' THEN m.name ELSE g.name END as name,
+          CASE WHEN a.person_type='member' THEN m.role ELSE '' END as role,
+          CASE WHEN a.person_type='member' THEN m.tags ELSE '' END as tags,
+          CASE WHEN a.person_type='guest' THEN g.vip ELSE 0 END as vip
+        FROM attendance a
+        LEFT JOIN members m ON a.person_type='member' AND a.person_id=m.id
+        LEFT JOIN guests g ON a.person_type='guest' AND a.person_id=g.id
+        WHERE a.meeting_id=?
+      `).bind(mid).all();
+
+      // Filter by group
+      let filtered = [];
+      for (const p of att.results) {
+        let match = false;
+        if (group === 'committee') match = !!(p.role && p.role !== '會員');
+        else if (group === 'vip') match = p.vip === 1;
+        else if (group === 'member') match = p.person_type === 'member' && (!p.role || p.role === '會員');
+        else if (group === 'guest') match = p.person_type === 'guest' && p.vip !== 1;
+        else if (group === 'surname') match = !!(surname && p.name && p.name.charAt(0) === surname);
+        else if (group === 'tag') match = !!(tag && p.tags && p.tags.split(',').map(t => t.trim()).includes(tag));
+        if (match) filtered.push(p);
+      }
+
+      if (!filtered.length) {
+        const desc = {committee:'委員',vip:'VIP嘉賓',member:'會員',guest:'來賓',surname:'姓'+surname+'嘅人',tag:'標籤「'+tag+'」嘅人'}[group] || group;
+        return Response.json({ ok: false, message: '搵唔到任何' + desc, count: 0 }, { headers: cors });
+      }
+
+      // Build map of which tables already have people
+      const tablePeople = {};
+      for (const a of att.results) {
+        if (a.table_number) {
+          if (!tablePeople[a.table_number]) tablePeople[a.table_number] = [];
+          tablePeople[a.table_number].push(a);
+        }
+      }
+      const existingNums = Object.keys(tablePeople).map(Number);
+      const maxExisting = existingNums.length ? Math.max(...existingNums) : 0;
+
+      function nextFreeTable(startFrom) {
+        for (let i = Math.max(startFrom, 1); i <= Math.max(maxExisting, 1); i++) {
+          if (!tablePeople[String(i)] || tablePeople[String(i)].length === 0) return String(i);
+        }
+        return String(Math.max(maxExisting, 0) + 1);
+      }
+
+      // Assign people to tables, splitting if over capacity
+      const assignments = [];
+      let currentTbl = targetTbl || nextFreeTable(1);
+      let batch = [];
+      let batchNames = [];
+
+      for (const p of filtered) {
+        batch.push(p);
+        batchNames.push(p.name);
+        if (batch.length >= maxPerTable) {
+          assignments.push({ table: currentTbl, people: batch, names: batchNames });
+          batch = [];
+          batchNames = [];
+          currentTbl = nextFreeTable(parseInt(currentTbl) + 1);
+        }
+      }
+      if (batch.length > 0) {
+        assignments.push({ table: currentTbl, people: batch, names: batchNames });
+      }
+
+      // Execute updates
+      const allUpdates = [];
+      for (const asgn of assignments) {
+        asgn.people.forEach((p, si) => {
+          const seat = si + 1;
+          allUpdates.push(
+            env.DB.prepare('UPDATE attendance SET table_number=?, seat_order=? WHERE id=?').bind(asgn.table, seat, p.att_id).run()
+          );
+          allUpdates.push(
+            p.person_type === 'member' ?
+              env.DB.prepare('UPDATE members SET table_number=?, seat_order=? WHERE id=?').bind(asgn.table, seat, p.person_id).run() :
+              env.DB.prepare('UPDATE guests SET table_number=?, seat_order=? WHERE id=?').bind(asgn.table, seat, p.person_id).run()
+          );
+        });
+      }
+      await Promise.all(allUpdates);
+
+      const summary = assignments.map(a => '🍽 ' + a.table + ' 號枱：' + a.names.join('、'));
+      const groupDesc = {committee:'委員',vip:'VIP嘉賓',member:'會員',guest:'來賓',surname:'姓'+surname+'嘅人',tag:'標籤「'+tag+'」嘅人'}[group] || group;
+      const meetingInfo = '📅 ' + meeting.date + ' ' + ({regular:'例會',special:'特別會議',anniversary:'週年聚餐'}[meeting.type] || meeting.type);
+
+      return Response.json({
+        ok: true,
+        message: '✅ ' + meetingInfo + '\n已將 ' + filtered.length + ' 位' + groupDesc + '排好位！\n' + summary.join('\n'),
+        meeting_id: mid,
+        meeting_date: meeting.date,
+        people: filtered.map(p => p.name).join('、'),
+        tables: assignments.map(a => a.table),
+        count: filtered.length
+      }, { headers: cors });
+    }
+
+    // ── move_table ───────────────────────────────────
+    if (action === 'move_table') {
+      const { from_table, to_table, meeting_id, max_per_table, force } = body;
+      if (!from_table || !to_table) return Response.json({ ok: false, error: 'from_table and to_table required' }, { headers: cors });
+      if (from_table === to_table) return Response.json({ ok: false, error: 'from_table and to_table must be different' }, { headers: cors });
+      let mid = meeting_id;
+      if (!mid) {
+        const latest = await env.DB.prepare('SELECT id, date, type FROM meetings ORDER BY date DESC LIMIT 1').first();
+        if (!latest) return Response.json({ ok: false, error: 'no meeting found' }, { headers: cors });
+        mid = latest.id;
+      }
+      const meeting = await env.DB.prepare('SELECT id, date, type FROM meetings WHERE id=?').bind(mid).first();
+      const maxPerTbl = parseInt(max_per_table) || 12;
+
+      // Count existing on target table
+      const existing = await env.DB.prepare(
+        'SELECT COUNT(*) as c FROM attendance WHERE meeting_id=? AND table_number=?'
+      ).bind(mid, to_table).first();
+      const existingCount = existing ? existing.c : 0;
+      const available = Math.max(0, maxPerTbl - existingCount);
+
+      // Get all people on source table
+      const peopleRes = await env.DB.prepare(
+        `SELECT a.id as att_id, a.person_type, a.person_id,
+          CASE WHEN a.person_type='member' THEN m.name ELSE g.name END as name
+        FROM attendance a
+        LEFT JOIN members m ON a.person_type='member' AND a.person_id=m.id
+        LEFT JOIN guests g ON a.person_type='guest' AND a.person_id=g.id
+        WHERE a.meeting_id=? AND a.table_number=?`
+      ).bind(mid, from_table).all();
+
+      if (!peopleRes.results.length) {
+        return Response.json({ ok: false, message: '第 ' + from_table + ' 號枱冇人喎！' }, { headers: cors });
+      }
+
+      const allPeople = peopleRes.results;
+      const fit = allPeople.slice(0, available);
+      const overflow = allPeople.slice(available);
+      const moves = [];
+
+      // Move people that fit
+      for (const p of fit) {
+        moves.push(
+          env.DB.prepare('UPDATE attendance SET table_number=?, seat_order=NULL WHERE id=?').bind(to_table, p.att_id).run()
+        );
+        moves.push(
+          p.person_type === 'member' ?
+            env.DB.prepare('UPDATE members SET table_number=?, seat_order=NULL WHERE id=?').bind(to_table, p.person_id).run() :
+            env.DB.prepare('UPDATE guests SET table_number=?, seat_order=NULL WHERE id=?').bind(to_table, p.person_id).run()
+        );
+      }
+
+      let message = '';
+      let overflowCount = 0;
+      if (overflow.length > 0 && !force) {
+        message = '⚠️ 第 ' + to_table + ' 號枱只能容納 ' + maxPerTbl + ' 人（已有 ' + existingCount + ' 人，剩 ' + available + ' 位）。已搬 ' + fit.length + ' 人，第 ' + from_table + ' 號枱仲有 ' + overflow.length + ' 人因爆滿未搬。';
+        overflowCount = overflow.length;
+      } else if (overflow.length > 0 && force) {
+        for (let k = 0; k < overflow.length; k += maxPerTbl) {
+          const batch = overflow.slice(k, k + maxPerTbl);
+          const nextTbl = String(parseInt(to_table) + 1 + Math.floor(k / maxPerTbl));
+          for (const p of batch) {
+            moves.push(
+              env.DB.prepare('UPDATE attendance SET table_number=?, seat_order=NULL WHERE id=?').bind(nextTbl, p.att_id).run()
+            );
+            moves.push(
+              p.person_type === 'member' ?
+                env.DB.prepare('UPDATE members SET table_number=?, seat_order=NULL WHERE id=?').bind(nextTbl, p.person_id).run() :
+                env.DB.prepare('UPDATE guests SET table_number=?, seat_order=NULL WHERE id=?').bind(nextTbl, p.person_id).run()
+            );
+          }
+        }
+        message = '✅ 已將第 ' + from_table + ' 號枱 ' + allPeople.length + ' 人搬走！第 ' + to_table + ' 號枱已滿 (' + maxPerTbl + ' 人)，其餘分到後續枱號。';
+        overflowCount = overflow.length;
+      }
+
+      await Promise.all(moves);
+
+      if (!message) {
+        const names = allPeople.map(p => p.name).join('、');
+        message = '✅ 已將第 ' + from_table + ' 號枱 ' + allPeople.length + ' 人全部搬去第 ' + to_table + ' 號枱！\n' + names;
+      }
+
+      return Response.json({
+        ok: true,
+        message: '(' + meeting.date + ') ' + message,
+        meeting_id: mid,
+        meeting_date: meeting.date,
+        from_table, to_table,
+        moved: fit.length,
+        overflow: overflowCount,
+        total: allPeople.length
+      }, { headers: cors });
+    }
+
+    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, create_meeting, update_meeting, delete_meeting, payment_summary, list_attendance, list_members, list_guests, create_member, update_member, create_guest, update_guest, add_to_meeting, delete_person, delete_attendance, delete_attendance_batch, get_settings, update_settings, export_stats, bulk_create_members, upload_image, list_tables, update_table_names, auto_seat, move_table` }, { headers: cors });
 
   } catch (e) {
     return Response.json({ ok: false, error: e.message }, { headers: cors });

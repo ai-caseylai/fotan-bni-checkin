@@ -298,3 +298,14 @@
 {"messages": [{"role": "user", "content": "Leadership Team有邊個"}, {"role": "assistant", "content": "火炭會嘅領導團隊（Leadership Team）包括主席、副主席、財務、秘書等職位。具體現任幹事名單請聯絡分會查詢。Mable Lam 係目前活躍嘅核心成員之一。"}]}
 {"messages": [{"role": "user", "content": "分會人數有冇上限"}, {"role": "assistant", "content": "每個分會通常限制每個行業只有一位代表，以避免內部競爭。人數方面冇嚴格上限，但一般健康嘅分會規模在30-80人之間。火炭會目前有75位會員，係一個大規模嘅活躍分會！"}]}
 {"messages": [{"role": "user", "content": "火炭會有咩特別之處"}, {"role": "assistant", "content": "火炭會嘅特色：🔥 位於火炭工業區，充滿本地特色 👥 75位活躍會員，涵蓋超過20個行業 🤝 會員之間互相引薦生意 🎉 定期舉辦週年聚餐等特別活動 📱 擁有智能簽到系統同AI助理。我哋歡迎各行各業嘅專業人士加入！"}]}
+{"messages": [{"role": "user", "content": "把所有委員放在同一張枱"}, {"role": "assistant", "content": "好，我幫你將所有委員排埋一齊！"}]}
+{"messages": [{"role": "user", "content": "請把所有嘉賓放在同一張枱"}, {"role": "assistant", "content": "明白，將VIP嘉賓全部放喺同一枱！"}]}
+{"messages": [{"role": "user", "content": "請把所有姓蘇的放在同一張枱"}, {"role": "assistant", "content": "收到，我幫你搵晒所有姓蘇嘅朋友，放喺同一張枱！"}]}
+{"messages": [{"role": "user", "content": "把所有會員放在同一張枱，如果一張枱不夠請自動放在第二張枱"}, {"role": "assistant", "content": "好，會員人數可能較多，我會每枱最多12人自動分枱！"}]}
+{"messages": [{"role": "user", "content": "幫我將委員排喺第1號枱"}, {"role": "assistant", "content": "冇問題，委員全部去第1號枱！"}]}
+{"messages": [{"role": "user", "content": "把所有來賓放在同一張枱"}, {"role": "assistant", "content": "好，將所有來賓（唔包VIP嘉賓）放喺同一枱！"}]}
+{"messages": [{"role": "user", "content": "將素食嘅人放喺同一張枱"}, {"role": "assistant", "content": "明白，我幫你搵晒標籤有「素食」嘅會員，排埋一齊！"}]}
+{"messages": [{"role": "user", "content": "幫我將標籤係長老的放在第3號枱"}, {"role": "assistant", "content": "收到，將標籤「長老」嘅人全部放喺第3號枱！"}]}
+{"messages": [{"role": "user", "content": "把所有需要翻譯嘅人排埋一齊"}, {"role": "assistant", "content": "好，我幫你搵晒標籤有「需要翻譯」嘅會員，全部放埋一枱！"}]}
+{"messages": [{"role": "user", "content": "把三號枱所有人移動到5號枱"}, {"role": "assistant", "content": "收到，將第3號枱全部人搬去第5號枱！"}]}
+{"messages": [{"role": "user", "content": "將第1枱嘅人搬去第2枱"}, {"role": "assistant", "content": "冇問題，成枱搬過去！"}]}

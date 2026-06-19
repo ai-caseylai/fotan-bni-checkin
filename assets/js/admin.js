@@ -58,8 +58,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
-  const isOpen = sidebar.classList.toggle('show');
-  overlay.classList.toggle('show', isOpen);
+  const main = document.getElementById('main-content');
+  if (window.innerWidth <= 1024) {
+    const isOpen = sidebar.classList.toggle('show');
+    overlay.classList.toggle('show', isOpen);
+  } else {
+    sidebar.classList.toggle('collapsed');
+    main.classList.toggle('expanded');
+  }
 }
 
 function closeSidebar() {
@@ -72,7 +78,7 @@ function switchPage(page) {
   document.querySelectorAll('.sb-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.getElementById('topbar-title').textContent = {
     overview: '總覽', meetings: '會議管理', members: '會員管理',
-    guests: '來賓管理', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練', skill: '火炭會 Skill'
+    guests: '來賓管理', seating: '餐桌排位', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練', skill: '火炭會 Skill'
   }[page] || '';
   if (page !== 'checkin') { clearInterval(ciPollTimer); ciPollTimer = null; }
   loadPage(page).catch(function(e) {
@@ -88,6 +94,7 @@ async function loadPage(page) {
     case 'members': await renderTablePage(pc, 'member', '會員'); break;
     case 'guests': await renderTablePage(pc, 'guest', '來賓'); break;
     case 'checkin': await renderCheckinOp(pc); break;
+    case 'seating': await renderSeating(pc); break;
     case 'settings': await renderSettingsPage(pc); break;
     case 'qatraining': await renderQATraining(pc); break;
     case 'docs': renderDocsPage(pc); break;
@@ -101,6 +108,8 @@ async function renderOverview(pc) {
     const stats = await api('/stats');
     const mts = await api('/meetings');
     const allGuests = await api('/guests');
+    const allMembers = await api('/members');
+    var memberRoleMap = {}; allMembers.forEach(function(m){ memberRoleMap[m.id] = m.role || '會員'; });
     const current = mts[0] || {};
     var detail = current.id ? await api('/meetings?id='+current.id) : null;
     var att = detail ? detail.attendance || [] : [];
@@ -113,7 +122,7 @@ async function renderOverview(pc) {
     var memberCount = att.filter(function(a){return a.person_type==='member'}).length;
     var guestCount = att.filter(function(a){return a.person_type==='guest'}).length;
     var arrivedCount = att.filter(function(a){return a.arrival_time&&a.arrival_time!=='absent'}).length;
-    var committeeCount = att.filter(function(a){return a.price_tier==='committee'}).length;
+    var committeeCount = att.filter(function(a){return a.price_tier==='committee' || (a.person_type==='member' && memberRoleMap[a.person_id] && memberRoleMap[a.person_id]!=='會員');}).length;
     var regularMemberCount = memberCount - committeeCount;
     var revenue = current.stats?.revenue || stats.revenue || 0;
     var memberFee = current.member_fee || 388;
@@ -124,11 +133,12 @@ async function renderOverview(pc) {
     var regularGuestCount = guestCount - vipGuestCount;
     var unpaidVipCount = unpaidArr.filter(function(a){return a.person_type==='guest' && vipMap[a.person_id]==1}).length;
     var unpaidRegularGuestCount = unpaidGuestCount - unpaidVipCount;
-    var unpaidCommitteeCount = unpaidArr.filter(function(a){return a.price_tier==='committee'}).length;
+    var unpaidCommitteeCount = unpaidArr.filter(function(a){return a.price_tier==='committee' || (a.person_type==='member' && memberRoleMap[a.person_id] && memberRoleMap[a.person_id]!=='會員');}).length;
     var unpaidRegularMemberCount = unpaidMemberCount - unpaidCommitteeCount;
+    var freeAmount = vipGuestCount*guestFee;
     var unpaidTotal = unpaidRegularMemberCount*memberFee + unpaidCommitteeCount*committeeFee + unpaidRegularGuestCount*guestFee;
 
-    var expectedTotal = regularMemberCount*memberFee + committeeCount*committeeFee + guestCount*guestFee;
+    var expectedTotal = regularMemberCount*memberFee + committeeCount*committeeFee + regularGuestCount*guestFee;
 
     pc.innerHTML = `
     <div class="panel" style="margin-bottom:16px">
@@ -146,16 +156,16 @@ async function renderOverview(pc) {
       <div class="stat-card"><div class="n">${arrivedCount}</div><div class="l">✅ 已簽到</div></div>
     </div>
     <div class="stat-grid">
-      <div class="stat-card"><div class="n">${paidOnlyCount}</div><div class="l">💰 收費</div></div>
-      <div class="stat-card"><div class="n">${freeCount}</div><div class="l">🆓 免費</div></div>
-      <div class="stat-card"><div class="n">${unpaidCount}</div><div class="l">⚠️ 未收人數</div></div>
-      <div class="stat-card"><div class="n" style="font-size:16px">🏅 委員 $${committeeFee} · 會員 $${memberFee}</div><div class="l">🏷️ 收費標準</div></div>
-      <div class="stat-card"><div class="n" style="font-size:16px">⭐ 嘉賓 免費 · 👥 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
-      <div class="stat-card"><div class="n" style="color:#10b981;font-size:28px">$${revenue.toLocaleString()}</div><div class="l">💰 已收收入</div></div>
+	      <div class="stat-card"><div class="n" style="color:#10b981">$${revenue.toLocaleString()}</div><div class="l">💰 收費 · ${paidOnlyCount}人</div></div>
+	      <div class="stat-card"><div class="n">${freeCount}</div><div class="l">🆓 免費</div></div>
+	      <div class="stat-card"><div class="n" style="color:#f59e0b">$${unpaidTotal.toLocaleString()}</div><div class="l">⚠️ 未收 · ${unpaidCount}人</div></div>
+	      <div class="stat-card"><div class="n" style="font-size:16px">🏅 委員 $${committeeFee} · 會員 $${memberFee}</div><div class="l">🏷️ 收費標準</div></div>
+	      <div class="stat-card"><div class="n" style="font-size:16px">⭐ 嘉賓 免費 · 👥 來賓 $${guestFee}</div><div class="l">🏷️ 收費標準</div></div>
+	      <div class="stat-card"><div class="n" style="color:#10b981;font-size:28px">$${revenue.toLocaleString()}</div><div class="l">💰 已收收入</div></div>
     </div>
     <div class="stat-grid">
-      <div class="stat-card" style="grid-column:span 2"><div class="n" style="color:#6366f1;font-size:26px">$${expectedTotal.toLocaleString()}</div><div class="l">📊 預計總收入（${att.length}人全部收齊）</div></div>
-      <div class="stat-card" style="grid-column:span 2"><div class="n" style="color:#f59e0b;font-size:20px">$${(expectedTotal-revenue).toLocaleString()}</div><div class="l">⚠️ 尚欠收入</div></div>
+      <div class="stat-card" style="grid-column:span 2"><div class="n" style="color:#6366f1;font-size:26px">$${expectedTotal.toLocaleString()}</div><div class="l">📊 預計總收入（${att.length - vipGuestCount}人收費 + ${vipGuestCount}人免費）</div></div>
+	      <div class="stat-card" style="grid-column:span 2"><div class="n" style="color:#f59e0b;font-size:20px">$${unpaidTotal.toLocaleString()}</div><div class="l">⚠️ 尚欠收入（未收）</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="panel">
@@ -168,8 +178,7 @@ async function renderOverview(pc) {
           <div style="font-size:13px;line-height:2">
             <div>🏅 委員 (${committeeCount}人 × $${committeeFee}) = <strong>$${(committeeCount*committeeFee).toLocaleString()}</strong></div>
             <div>👤 會員 (${regularMemberCount}人 × $${memberFee}) = <strong>$${(regularMemberCount*memberFee).toLocaleString()}</strong></div>
-            <div>⭐ 嘉賓 (${vipGuestCount}人 · 免費) = <strong>$0</strong></div>
-            <div>👥 來賓 (${regularGuestCount}人 × $${guestFee}) = <strong>$${(regularGuestCount*guestFee).toLocaleString()}</strong></div>
+            <div>👥 來賓 (${regularGuestCount}人 × ${guestFee}) = <strong>${(regularGuestCount*guestFee).toLocaleString()}</strong></div>
             <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px">💰 收費 (${paidOnlyCount}人) = <strong style="color:#10b981">$${revenue.toLocaleString()}</strong></div>
             <div>🆓 免費 (${freeCount}人)</div>
             <div>⚠️ 未收 <strong>${unpaidCount}人</strong> ≈ <strong style="color:#f59e0b">$${unpaidTotal.toLocaleString()}</strong></div>
@@ -191,6 +200,550 @@ async function renderOverview(pc) {
   } catch(e) {
     pc.innerHTML = '<div class="empty">載入失敗：'+esc(e.message)+'</div>';
   }
+}
+
+// ── Table Seating (Drag & Drop) ────────────────────
+var seatingData = {};
+var seatingMeetingId = null;
+var seatingAllPeople = [];
+var seatingMaxPerTable = 12;
+var seatingTableDrag = null;
+
+async function renderSeating(pc) {
+  pc.innerHTML = '<div class="loading">載入餐桌排位...</div>';
+  try {
+    var mts = await api('/meetings');
+    if (!mts.length) { pc.innerHTML = '<div class="empty">暫無會議記錄</div>'; return; }
+    var current = mts[0];
+    seatingMeetingId = current.id;
+    var detail = await api('/meetings?id='+current.id);
+    var att = detail.attendance || [];
+    // Load ALL members (including soft-deleted) so names resolve for existing attendance records
+    var allMembers = await api('/members?all=1');
+    var allGuests = await api('/guests');
+
+    // Build attendance lookup map — only show people WITH attendance records
+    var attMap = {};
+    att.forEach(function(a){ attMap[a.person_type+'_'+a.person_id] = a; });
+
+    var pLookup = {};
+    allMembers.forEach(function(m){ m._type = 'member'; pLookup['member_'+m.id] = m; });
+    allGuests.forEach(function(g){ g._type = 'guest'; pLookup['guest_'+g.id] = g; });
+
+    seatingData = {};
+    seatingAllPeople = [];
+
+    att.forEach(function(a){
+      var p = pLookup[a.person_type+'_'+a.person_id] || {};
+      var absent = a.arrival_time === 'absent';
+	      var tbl = a.table_number || '';
+      if (tbl && /^\d+\.0$/.test(tbl)) tbl = String(parseInt(tbl));
+      var entry = {
+        attId: a.id,
+        personType: a.person_type,
+        personId: a.person_id,
+        personName: p.name || '?',
+        isCommittee: !!(p.role && p.role !== '會員'),
+        isVip: !!p.vip,
+        payment: a.payment || '',
+        absent: absent,
+        table: tbl,
+        seat: a.seat_order || null,
+        isNew: false
+      };
+      seatingAllPeople.push(entry);
+      if (!tbl) tbl = '未排位';
+      if (!seatingData[tbl]) seatingData[tbl] = [];
+      seatingData[tbl].push(entry);
+    });
+
+    var maxSeats = 0;
+    for (var t in seatingData) {
+      if (t !== '未排位' && seatingData[t].length > maxSeats) maxSeats = seatingData[t].length;
+    }
+    seatingMaxPerTable = Math.max(maxSeats, 12);
+
+    // Load table positions, table count & max-per-table from D1 (cross-browser sync)
+    await seatingLoadPositionsFromServer();
+    try {
+      var settings = await api('/settings');
+      var tcKey = 'seating_table_count_' + seatingMeetingId;
+      var mpKey = 'seating_max_per_table_' + seatingMeetingId;
+      if (settings[tcKey]) {
+        var serverCount = parseInt(settings[tcKey]);
+        if (serverCount > 0) { localStorage.setItem('seating_tblcnt_'+seatingMeetingId, String(serverCount)); }
+      }
+      if (settings[mpKey]) {
+        seatingMaxPerTable = parseInt(settings[mpKey]) || 12;
+      }
+      var tnKey = 'seating_names_' + seatingMeetingId;
+      if (settings[tnKey]) {
+        try {
+          var serverNames = JSON.parse(settings[tnKey]);
+          localStorage.setItem('seating_names_'+seatingMeetingId, JSON.stringify(serverNames));
+        } catch(e) {}
+      }
+    } catch(e) {}
+
+    // Show all tables that have data, plus any saved empty ones within the configured count
+    var savedCount = seatingLoadTableCount();
+    var tablesWithData = Object.keys(seatingData).filter(function(k){ return k!=='未排位' && seatingData[k].length > 0; });
+    var maxTblFromData = tablesWithData.length ? Math.max.apply(null, tablesWithData.map(Number)) : 0;
+    var effectiveCount = Math.max(maxTblFromData, savedCount || 0, 1);
+    // Add empty tables if savedCount exceeds data
+    for (var si=1; si<=effectiveCount; si++) {
+      if (!seatingData[String(si)]) seatingData[String(si)] = [];
+    }
+    // Save effective count so dropdown reflects reality
+    if (effectiveCount !== savedCount) seatingSaveTableCount(effectiveCount);
+
+    seatingRender(pc, current);
+  } catch(e) {
+    pc.innerHTML = '<div class="empty">載入餐桌排位失敗：'+esc(e.message)+'</div>';
+  }
+}
+
+// ── Table position & name persistence (localStorage) ─
+var seatingPositionsCache = {};
+function seatingLoadPositions() {
+  return seatingPositionsCache || {};
+}
+async function seatingLoadPositionsFromServer() {
+  try {
+    var settings = await api('/settings');
+    var key = 'seating_positions_' + seatingMeetingId;
+    seatingPositionsCache = settings[key] ? JSON.parse(settings[key]) : {};
+  } catch(e) { seatingPositionsCache = {}; }
+  return seatingPositionsCache;
+}
+function seatingSavePositions(pos) {
+  seatingPositionsCache = pos;
+  // Fire-and-forget save to D1
+  var key = 'seating_positions_' + seatingMeetingId;
+  var body = {};
+  body[key] = JSON.stringify(pos);
+  api('/settings', {method:'PUT', body:JSON.stringify(body)}).catch(function(){});
+}
+function seatingLoadNames() {
+  try {
+    return JSON.parse(localStorage.getItem('seating_names_'+seatingMeetingId) || '{}');
+  } catch(e) { return {}; }
+}
+function seatingSaveNames(names) {
+  localStorage.setItem('seating_names_'+seatingMeetingId, JSON.stringify(names));
+  // Sync to D1 for cross-browser access and API support
+  var key = 'seating_names_' + seatingMeetingId;
+  var body = {};
+  body[key] = JSON.stringify(names);
+  api('/settings', {method:'PUT', body:JSON.stringify(body)}).catch(function(){});
+}
+function seatingLoadTableCount() {
+  // localStorage fast cache, overridden by server on load
+  try {
+    var v = localStorage.getItem('seating_tblcnt_'+seatingMeetingId);
+    return v ? parseInt(v) : 0;
+  } catch(e) { return 0; }
+}
+function seatingSaveTableCount(n) {
+  localStorage.setItem('seating_tblcnt_'+seatingMeetingId, String(n));
+  // Also save to D1 for cross-browser sync
+  var key = 'seating_table_count_' + seatingMeetingId;
+  var body = {};
+  body[key] = String(n);
+  api('/settings', {method:'PUT', body:JSON.stringify(body)}).catch(function(){});
+}
+function seatingGetTableName(tbl) {
+  var names = seatingLoadNames();
+  return names[tbl] || ('第 '+tbl+' 號枱');
+}
+
+function seatingRender(pc, current) {
+  var tableKeys = Object.keys(seatingData).sort(function(a,b){
+    if (a==='未排位') return 1;
+    if (b==='未排位') return -1;
+    return parseInt(a)-parseInt(b);
+  });
+  var regularTables = tableKeys.filter(function(k){ return k!=='未排位'; });
+  var tableCount = regularTables.length;
+  var unassignedCount = (seatingData['未排位'] || []).length;
+  var assignedCount = seatingAllPeople.length - unassignedCount;
+
+  var html = '<div class="seating-toolbar">';
+  html += '<div><h2 style="font-size:16px">🍽 '+current.date+' '+mLblText(current.type)+'</h2><span style="color:var(--text2);font-size:12px">共 '+seatingAllPeople.length+' 人 · 已排 '+assignedCount+' 人</span></div>';
+  html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+  html += '<label style="font-size:11px;color:var(--text2);white-space:nowrap">枱數</label>';
+  html += '<select onchange="seatingSetTableCount(this.value)" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:#fff;outline:none">';
+  for (var i=1; i<=20; i++) {
+    html += '<option value="'+i+'"'+(i===tableCount?' selected':'')+'>'+i+' 張枱</option>';
+  }
+  html += '</select>';
+  html += '<label style="font-size:11px;color:var(--text2);white-space:nowrap;margin-left:4px">每枱上限</label>';
+  html += '<select onchange="seatingSetMaxPerTable(this.value)" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:#fff;outline:none">';
+  var seatOptions = [6,8,10,12,14,16,18,20];
+  seatOptions.forEach(function(n){
+    html += '<option value="'+n+'"'+(n===seatingMaxPerTable?' selected':'')+'>'+n+' 人</option>';
+  });
+  html += '</select>';
+  html += '<button class="btn btn-sm" style="background:#10b981;color:#fff;margin-left:4px" onclick="seatingSave()">💾 儲存排位</button>';
+  html += '</div></div>';
+
+  // Unassigned panel (always visible, at top)
+  html += '<div class="seating-unassigned" id="seating-unassigned" ondragover="seatingDragOver(event)" ondragleave="seatingDragLeave(event)" ondrop="seatingDrop(event,\'未排位\')">';
+  html += '<div class="seating-unassigned-hdr"><span>📋 未排位</span><span class="seating-tbl-cnt" style="background:#f59e0b;color:#fff;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">'+(seatingData['未排位']||[]).length+' 人</span></div>';
+  html += '<div class="seating-unassigned-body">';
+  (seatingData['未排位']||[]).forEach(function(a){ html += seatingPersonCard(a); });
+  if (!(seatingData['未排位']||[]).length) html += '<div class="seating-empty-hint">所有人已排位 ✓</div>';
+  html += '</div></div>';
+
+  // Free-position canvas
+  html += '<div class="seating-canvas" id="seating-canvas">';
+  var positions = seatingLoadPositions();
+  regularTables.forEach(function(tbl, idx){
+    var list = seatingData[tbl];
+    list.sort(function(a,b){ var sa = a.seat ? parseInt(a.seat) : 999; var sb = b.seat ? parseInt(b.seat) : 999; return sa - sb; });
+    var pos = positions[tbl] || {x: (idx%4)*260, y: Math.floor(idx/4)*340};
+    var isFull = list.length >= seatingMaxPerTable;
+    var overCap = list.length > seatingMaxPerTable;
+    var hdrClass = overCap ? 'overcap' : (isFull ? 'full' : '');
+    var cntLabel = list.length+'/'+seatingMaxPerTable+'人';
+
+    html += '<div class="seating-table seating-table-free'+(isFull?' full':'')+(overCap?' overcap':'')+'" data-table="'+esc(tbl)+'" style="left:'+pos.x+'px;top:'+pos.y+'px" ondragover="seatingDragOver(event)" ondragleave="seatingDragLeave(event)" ondrop="seatingDrop(event,\''+esc(tbl)+'\')">';
+    var tblName = seatingGetTableName(tbl);
+    html += '<div class="seating-table-hdr '+hdrClass+'" onmousedown="seatingTableDragStart(event,\''+esc(tbl)+'\')" ondblclick="seatingRenameTable(\''+esc(tbl)+'\')" title="雙擊改名">';
+    html += '<span>🍽 '+esc(tblName)+'</span>';
+    html += '<span style="display:flex;gap:4px;align-items:center">';
+    html += '<span class="seating-tbl-cnt">'+cntLabel+'</span>';
+    if (overCap) html += '<span style="font-size:10px;color:#fee2e2;font-weight:700">⚠️</span>';
+    html += '</span></div>';
+    html += '<div class="seating-table-body">';
+    list.forEach(function(a, si){ html += seatingPersonCard(a, si+1); });
+    if (list.length === 0) html += '<div class="seating-empty-hint">拖放嘉賓到此枱</div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  pc.innerHTML = html;
+
+  // Set canvas size dynamically to fit all tables
+  var canvasHeight2 = 0, canvasWidth2 = 0;
+  regularTables.forEach(function(tbl){
+    var pos2 = positions[tbl] || {x: (regularTables.indexOf(tbl)%4)*260, y: Math.floor(regularTables.indexOf(tbl)/4)*340};
+    var bottom = pos2.y + 400;
+    var right = pos2.x + 250;
+    if (bottom > canvasHeight2) canvasHeight2 = bottom;
+    if (right > canvasWidth2) canvasWidth2 = right;
+  });
+  var canvas2 = document.getElementById('seating-canvas');
+  if (canvas2) { canvas2.style.minHeight = Math.max(canvasHeight2, 600) + 'px'; canvas2.style.minWidth = Math.max(canvasWidth2, 600) + 'px'; }
+
+  // Global mouse handlers for table dragging (remove first to avoid duplicates)
+  document.removeEventListener('mousemove', seatingTableDragMove);
+  document.removeEventListener('mouseup', seatingTableDragEnd);
+  document.addEventListener('mousemove', seatingTableDragMove);
+  document.addEventListener('mouseup', seatingTableDragEnd);
+}
+
+function seatingPersonCard(a, seatNo) {
+  var paid = a.payment === 'paid' || a.payment === 'free';
+  var payDot = '<span class="seating-dot '+(paid?'paid':'unpaid')+'" title="'+(paid?'已付':'未付')+'"></span>';
+  var typeLabel, avClass;
+  if (a.isCommittee) { typeLabel = '🏅委員'; avClass = 'committee'; }
+  else if (a.isVip) { typeLabel = '⭐嘉賓'; avClass = 'vip'; }
+  else if (a.personType === 'member') { typeLabel = '👤會員'; avClass = 'member'; }
+  else { typeLabel = '👥來賓'; avClass = 'guest'; }
+  if (a.absent) { typeLabel += ' ✕'; }
+  var seatBadge = seatNo ? '<span class="seating-seat-badge">#'+seatNo+'</span>' : '';
+
+  var card = '<div class="seating-person '+avClass+(a.absent?' absent':'')+'" draggable="true" ';
+  card += 'data-attid="'+a.attId+'" data-table="'+esc(a.table||'未排位')+'" ';
+  card += 'ondragstart="seatingDragStart(event)" ondragend="seatingDragEnd(event)">';
+  card += '<div class="seating-av">'+esc(a.personName.charAt(0))+'</div>';
+  card += '<div class="seating-info">'+payDot+'<span>'+esc(a.personName)+'</span></div>';
+  card += seatBadge;
+  card += '<span class="seating-type-badge">'+typeLabel+'</span>';
+  card += '</div>';
+  return card;
+}
+
+// ── Person Drag & Drop ─────────────────────────────
+function seatingDragStart(e) {
+  e.dataTransfer.setData('text/plain', e.target.closest('.seating-person').dataset.attid);
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(function(){ e.target.closest('.seating-person').classList.add('dragging'); }, 0);
+}
+function seatingDragEnd(e) {
+  e.target.closest('.seating-person').classList.remove('dragging');
+  document.querySelectorAll('.seating-table.drag-over,.seating-unassigned.drag-over').forEach(function(el){ el.classList.remove('drag-over'); });
+}
+function seatingDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  var zone = e.target.closest('.seating-table') || e.target.closest('#seating-unassigned');
+  if (!zone) return;
+  var tbl = zone.dataset.table || (zone.id==='seating-unassigned'?'未排位':'');
+  if (tbl && tbl !== '未排位') {
+    var list = seatingData[tbl] || [];
+    if (list.length >= seatingMaxPerTable) return;
+  }
+  zone.classList.add('drag-over');
+}
+function seatingDragLeave(e) {
+  var zone = e.target.closest('.seating-table') || e.target.closest('#seating-unassigned');
+  if (zone && !zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+}
+function seatingDrop(e, targetTable) {
+  e.preventDefault();
+  var zone = e.target.closest('.seating-table') || e.target.closest('#seating-unassigned');
+  if (zone) zone.classList.remove('drag-over');
+
+  var attId = parseInt(e.dataTransfer.getData('text/plain'));
+  var person = null, sourceTable = null;
+  for (var tbl in seatingData) {
+    var idx = seatingData[tbl].findIndex(function(p){ return p.attId === attId; });
+    if (idx !== -1) { person = seatingData[tbl][idx]; sourceTable = tbl; seatingData[tbl].splice(idx, 1); break; }
+  }
+  if (!person) return;
+
+  // Allow reorder within same table even when full
+  if (targetTable !== '未排位' && sourceTable !== targetTable) {
+    var list = seatingData[targetTable] || [];
+    if (list.length >= seatingMaxPerTable) { toast('⚠️ 此枱已滿 ('+seatingMaxPerTable+'人上限)'); return; }
+  }
+
+  person.table = targetTable === '未排位' ? '' : targetTable;
+  if (!seatingData[targetTable]) seatingData[targetTable] = [];
+
+  // Determine insert position from drop Y coordinate
+  var targetBody = zone ? zone.querySelector('.seating-table-body') : null;
+  var insertIdx = seatingData[targetTable].length;
+  if (targetBody) {
+    var cards = targetBody.querySelectorAll('.seating-person');
+    var dropY = e.clientY;
+    for (var ci = 0; ci < cards.length; ci++) {
+      var rect = cards[ci].getBoundingClientRect();
+      if (dropY < rect.top + rect.height / 2) { insertIdx = ci; break; }
+    }
+  }
+  seatingData[targetTable].splice(insertIdx, 0, person);
+  seatingRenderGrid(document.getElementById('page-content'));
+  seatingSave(true); // auto-save silently after drag
+}
+
+// ── Table position dragging ────────────────────────
+function seatingTableDragStart(e, tbl) {
+  if (e.target.tagName === 'BUTTON') return;
+  var tableEl = e.target.closest('.seating-table');
+  if (!tableEl) return;
+  e.preventDefault();
+  var rect = tableEl.getBoundingClientRect();
+  var canvas = document.getElementById('seating-canvas');
+  var canvasRect = canvas.getBoundingClientRect();
+  seatingTableDrag = {
+    tbl: tbl,
+    el: tableEl,
+    offsetX: e.clientX - rect.left,
+    offsetY: e.clientY - rect.top,
+    canvasLeft: canvasRect.left,
+    canvasTop: canvasRect.top
+  };
+  tableEl.style.zIndex = '10';
+  tableEl.style.cursor = 'grabbing';
+}
+function seatingTableDragMove(e) {
+  if (!seatingTableDrag) return;
+  e.preventDefault();
+  var x = e.clientX - seatingTableDrag.canvasLeft - seatingTableDrag.offsetX;
+  var y = e.clientY - seatingTableDrag.canvasTop - seatingTableDrag.offsetY;
+  x = Math.max(0, x); y = Math.max(0, y);
+  seatingTableDrag.el.style.left = x+'px';
+  seatingTableDrag.el.style.top = y+'px';
+}
+function seatingTableDragEnd(e) {
+  if (!seatingTableDrag) return;
+  seatingTableDrag.el.style.zIndex = '';
+  seatingTableDrag.el.style.cursor = '';
+  var pos = seatingLoadPositions();
+  pos[seatingTableDrag.tbl] = {
+    x: parseInt(seatingTableDrag.el.style.left),
+    y: parseInt(seatingTableDrag.el.style.top)
+  };
+  seatingSavePositions(pos);
+  seatingTableDrag = null;
+}
+
+function seatingRenderGrid(pc) {
+  var canvas = document.getElementById('seating-canvas');
+  if (!canvas) { seatingRender(pc || document.getElementById('page-content'), {date:'',type:'regular'}); return; }
+
+  var tableKeys = Object.keys(seatingData);
+  var regularTables = tableKeys.filter(function(k){ return k!=='未排位'; }).sort(function(a,b){ return parseInt(a)-parseInt(b); });
+  var positions = seatingLoadPositions();
+
+  // Update unassigned panel
+  var ua = document.getElementById('seating-unassigned');
+  if (ua) {
+    var list = seatingData['未排位'] || [];
+    var hdrSpan = ua.querySelector('.seating-tbl-cnt');
+    if (hdrSpan) hdrSpan.textContent = list.length+' 人';
+    var body = ua.querySelector('.seating-unassigned-body');
+    if (body) {
+      body.innerHTML = '';
+      list.forEach(function(a){ body.innerHTML += seatingPersonCard(a); });
+      if (!list.length) body.innerHTML = '<div class="seating-empty-hint">所有人已排位 ✓</div>';
+    }
+  }
+
+  // Update table cards
+  regularTables.forEach(function(tbl){
+    var list = seatingData[tbl] || [];
+    var el = canvas.querySelector('.seating-table[data-table="'+tbl+'"]');
+    if (!el) {
+      // Create new table card
+      var pos = positions[tbl] || {x: (regularTables.indexOf(tbl)%4)*260, y: Math.floor(regularTables.indexOf(tbl)/4)*340};
+      var isFull = list.length >= seatingMaxPerTable;
+      var overCap = list.length > seatingMaxPerTable;
+      var hdrClass = overCap ? 'overcap' : (isFull ? 'full' : '');
+      var cntLabel = list.length+'/'+seatingMaxPerTable+'人';
+      var div = document.createElement('div');
+      div.className = 'seating-table seating-table-free'+(isFull?' full':'')+(overCap?' overcap':'');
+      div.dataset.table = tbl;
+      div.style.cssText = 'left:'+pos.x+'px;top:'+pos.y+'px';
+      div.addEventListener('dragover', seatingDragOver);
+      div.addEventListener('dragleave', seatingDragLeave);
+      div.addEventListener('drop', function(ev){ seatingDrop(ev, tbl); });
+      var tblName2 = seatingGetTableName(tbl);
+      div.innerHTML = '<div class="seating-table-hdr '+hdrClass+'" onmousedown="seatingTableDragStart(event,\''+tbl+'\')" ondblclick="seatingRenameTable(\''+tbl+'\')" title="雙擊改名">'+
+        '<span>🍽 '+esc(tblName2)+'</span>'+
+        '<span style="display:flex;gap:4px;align-items:center"><span class="seating-tbl-cnt">'+cntLabel+'</span>'+(overCap?'<span style="font-size:10px;color:#fee2e2;font-weight:700">⚠️</span>':'')+'</span></div>'+
+        '<div class="seating-table-body"></div>';
+      canvas.appendChild(div);
+      el = div;
+    }
+    // Update body
+    var body = el.querySelector('.seating-table-body');
+    var hdr = el.querySelector('.seating-table-hdr');
+    var cnt = el.querySelector('.seating-tbl-cnt');
+    var isFull = list.length >= seatingMaxPerTable;
+    var overCap = list.length > seatingMaxPerTable;
+    var hdrClass = overCap ? 'overcap' : (isFull ? 'full' : '');
+    if (cnt) cnt.textContent = list.length+'/'+seatingMaxPerTable+'人';
+    if (hdr) {
+      hdr.className = 'seating-table-hdr '+hdrClass;
+      var nameSpan = hdr.querySelector('span:first-child');
+      if (nameSpan) nameSpan.textContent = '🍽 '+seatingGetTableName(tbl);
+    }
+    el.classList.toggle('full', isFull);
+    el.classList.toggle('overcap', overCap);
+    if (body) {
+      body.innerHTML = '';
+      list.forEach(function(a){ body.innerHTML += seatingPersonCard(a); });
+      if (list.length === 0) body.innerHTML = '<div class="seating-empty-hint">拖放嘉賓到此枱</div>';
+    }
+  });
+
+  // Remove table cards that no longer exist
+  canvas.querySelectorAll('.seating-table').forEach(function(el){
+    var tbl = el.dataset.table;
+    if (!seatingData[tbl]) el.remove();
+  });
+
+  // Dynamically resize canvas
+  var cH = 0, cW = 0;
+  canvas.querySelectorAll('.seating-table').forEach(function(el){
+    var b = parseInt(el.style.top || '0') + 400;
+    var r = parseInt(el.style.left || '0') + 250;
+    if (b > cH) cH = b;
+    if (r > cW) cW = r;
+  });
+  canvas.style.minHeight = Math.max(cH, 600) + 'px';
+  canvas.style.minWidth = Math.max(cW, 600) + 'px';
+}
+
+// ── Table count / seat limit ───────────────────────
+function seatingSetTableCount(n) {
+  n = parseInt(n);
+  var oldKeys = Object.keys(seatingData).filter(function(k){ return k!=='未排位'; });
+  var oldMax = oldKeys.length ? Math.max.apply(null, oldKeys.map(Number)) : 0;
+  if (n === oldMax) return;
+  seatingSaveTableCount(n);
+  var unassigned = seatingData['未排位'] || [];
+
+  if (n > oldMax) {
+    // Increasing: keep all existing assignments, add empty tables
+    for (var i = oldMax + 1; i <= n; i++) { seatingData[String(i)] = []; }
+  } else {
+    // Decreasing: keep tables 1..n intact, redistribute overflow from removed tables
+    var overflow = [];
+    for (var i = n + 1; i <= oldMax; i++) {
+      var key = String(i);
+      if (seatingData[key]) { overflow = overflow.concat(seatingData[key]); }
+      delete seatingData[key];
+    }
+    overflow.forEach(function(p) {
+      var placed = false;
+      for (var j = 1; j <= n; j++) {
+        var key2 = String(j);
+        if (seatingData[key2] && seatingData[key2].length < seatingMaxPerTable) {
+          p.table = key2;
+          seatingData[key2].push(p);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) { p.table = ''; unassigned.push(p); }
+    });
+    seatingData['未排位'] = unassigned;
+  }
+  seatingRenderGrid(document.getElementById('page-content'));
+}
+
+function seatingRenameTable(tbl) {
+  var current = seatingGetTableName(tbl);
+  var newName = prompt('請輸入枱名（留空還原「第'+tbl+'號枱」）：', current === ('第 '+tbl+' 號枱') ? '' : current);
+  if (newName === null) return; // cancelled
+  var names = seatingLoadNames();
+  if (!newName || newName.trim() === '') {
+    delete names[tbl];
+  } else {
+    names[tbl] = newName.trim();
+  }
+  seatingSaveNames(names);
+  var pc = document.getElementById('page-content');
+  seatingRenderGrid(pc);
+}
+
+function seatingSetMaxPerTable(n) {
+  seatingMaxPerTable = parseInt(n);
+  // Save to D1 for cross-browser sync
+  var key = 'seating_max_per_table_' + seatingMeetingId;
+  var body = {};
+  body[key] = String(seatingMaxPerTable);
+  api('/settings', {method:'PUT', body:JSON.stringify(body)}).catch(function(){});
+  seatingRenderGrid(document.getElementById('page-content'));
+}
+
+async function seatingSave(silent) {
+  var updates = [];
+  for (var tbl in seatingData) {
+    seatingData[tbl].forEach(function(p, si){
+      var newTbl = tbl === '未排位' ? '' : tbl;
+      if (newTbl && /^\d+\.0$/.test(newTbl)) newTbl = String(parseInt(newTbl));
+      var seatOrder = (tbl === '未排位') ? null : (si + 1);
+      updates.push(api('/attendance', {method:'PUT', body:JSON.stringify({id:p.attId, table_number:newTbl, seat_order:seatOrder})}));
+    });
+  }
+  await Promise.all(updates);
+  // Update person default table_number + seat_order
+  var personUpdates = [];
+  for (var tbl in seatingData) {
+    if (tbl === '未排位') continue;
+    seatingData[tbl].forEach(function(p, si){
+      var endpoint = p.personType === 'member' ? '/members' : '/guests';
+      personUpdates.push(api(endpoint+'?id='+p.personId, {method:'PUT', body:JSON.stringify({table_number:tbl, seat_order: si + 1})}));
+    });
+  }
+  await Promise.all(personUpdates);
+  if (!silent) toast('✅ 排位已儲存 ('+updates.length+' 更新)');
 }
 
 async function renderOverviewCharts(mts) {
@@ -431,7 +984,7 @@ async function markPaymentType(attId, paymentType) {
   hideModal();
 }
 async function deleteAttendee(attId) {
-  await api('/attendance', {method:'DELETE',body:JSON.stringify({id:attId})});
+  await api('/attendance', {method:'PUT',body:JSON.stringify({id:attId, _delete:true})});
   toast('已刪除出席記錄');
   hideModal();
 }
@@ -586,11 +1139,19 @@ async function toggleMeetingRow(mid) {
     var html = '<div style="font-weight:700;font-size:12px;color:var(--text);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px">'+secIcon+' '+secLabel+' <span style="color:var(--text2);font-weight:400">('+secAtt.length+'人)</span></div>';
     html += sorted.map(function(a){
       var ptype = a.person_type;
-      var pname = esc(getName(ptype, a.person_id));
+var pname = getName(ptype, a.person_id);
       var absent = a.arrival_time === 'absent';
+      var unpaid = !a.payment || a.payment === 'unpaid' || a.payment === '';
       var payCls = absent ? 'absent' : (a.payment==='free'?'free':(a.payment==='paid'?'paid':'unpaid'));
-      return '<div class="att-mini att-'+payCls+'">'+
-        '<span style="flex:1;font-weight:500">'+pname+'</span>'+
+      var onclick = '';
+      if (unpaid && !absent) {
+        var personList = ptype==='member' ? allMembers : allGuests;
+        var person = personList.find(function(p){return p.id == a.person_id;});
+        var personTel = person ? (person.tel||'') : '';
+        onclick = ' onclick="event.stopPropagation();showSingleWaReminder(\''+esc(pname)+'\',\''+esc(personTel)+'\')" style="cursor:pointer;border-left:3px solid #f59e0b"';
+      }
+      return '<div class="att-mini att-'+payCls+'"'+onclick+'>'+
+        '<span style="flex:1;font-weight:500">'+esc(pname)+'</span>'+
         (a.substitute ? '<span style="font-size:11px;color:var(--text2)">代:'+esc(a.substitute)+'</span>' : '')+
         '<span style="color:'+(absent?'#94a3b8':'var(--primary)')+';font-weight:500;min-width:50px;text-align:center">'+(absent?'缺席':a.arrival_time||'—')+'</span>'+
         '<span class="badge '+payClass(a.payment)+'">'+payLabel(a.payment)+'</span>'+
@@ -976,6 +1537,7 @@ async function showPersonForm(type, editId) {
     extra += `<label>專業領域</label><input type="text" id="pf-prof" value="${esc(p.professional||'')}" placeholder="專業/行業">`;
     extra += `<label>電郵</label><input type="email" id="pf-email" value="${esc(p.email||'')}" placeholder="email@example.com">`;
     extra += `<label>會費付費日</label><input type="date" id="pf-fee-date" value="${esc(p.fee_paid_date||'')}">`;
+    extra += `<label>標籤 <span style="font-size:10px;color:var(--text3)">（逗號分隔，用嚟排位篩選）</span></label><input type="text" id="pf-tags" value="${esc(p.tags||'')}" placeholder="例如：素食、長老、需要翻譯">`;
   }
   if (type === 'guest') {
     extra += `<label>專業</label><input type="text" id="pf-prof" value="${esc(p.professional||'')}" placeholder="專業/行業">`;
@@ -1024,6 +1586,7 @@ async function showPersonForm(type, editId) {
       body.professional = document.getElementById('pf-prof')?.value || '';
       body.role = document.getElementById('pf-role')?.value || '會員';
       body.bio = document.getElementById('pf-bio')?.value || '';
+      body.tags = document.getElementById('pf-tags')?.value || '';
     }
     if (type === 'guest') body.professional = document.getElementById('pf-prof')?.value || '';
     if (type === 'observer') body.chapter = document.getElementById('pf-chapter')?.value || '';
@@ -1054,7 +1617,7 @@ async function showPersonForm(type, editId) {
 
 async function deletePerson(type, id, name) {
   if (!confirm(`確定要刪除「${name}」嗎？`)) return;
-  await api(`/${type}s?id=${id}`, { method: 'DELETE' });
+  await api(`/${type}s?id=${id}`, { method: 'PUT', body: JSON.stringify({active: 0}) });
   toast('已刪除');
   await loadAllData();
   const el = document.getElementById('tbl-body');
@@ -1479,6 +2042,12 @@ async function renderSettingsPage(pc) {
       ]
     },
     {
+      icon: '💬', title: 'WhatsApp 催款設定',
+      textareas: [
+        { key: 'waReminderMsg', label: '催款訊息模板（{name}=姓名, {date}=日期, {fee}=費用）', placeholder: '您好 {name}，火炭會聚會溫馨提醒：您已出席 {date} 的聚會但尚未付款 (HK${fee})。請盡快安排，謝謝！🙏', rows: 4 },
+      ]
+    },
+    {
       icon: '💳', title: '付款連結與 QR 碼',
       fields: [
         { key: 'paymeLink', label: 'PayMe 付款連結', placeholder: 'https://payme.hsbc/fotan' },
@@ -1826,6 +2395,15 @@ async function sendChat() {
     const sessions = getSessions();
     const idx = sessions.findIndex(s => s.id === session.id);
     if (idx >= 0) { sessions[idx] = session; saveSessions(sessions); }
+
+    // Auto-refresh seating page if chatbot updated seating data
+    var tools = data.tools_used || [];
+    var reply = (data.reply || '').toLowerCase();
+    var seatingKeywords = reply.indexOf('枱') !== -1 || reply.indexOf('排位') !== -1 || reply.indexOf('號枱') !== -1;
+    if ((tools.indexOf('auto_seat') !== -1 || tools.indexOf('move_table') !== -1 || tools.indexOf('update_table') !== -1 || seatingKeywords) && currentPage === 'seating') {
+      var pc = document.getElementById('page-content');
+      if (pc) loadPage('seating');
+    }
   } catch(e) {
     document.querySelector('#chat-msgs .chat-msg:last-child').remove();
     appendChatMsg('system', '連線失敗：'+esc(e.message));
@@ -1900,7 +2478,29 @@ async function uploadOpsReceipt(memberId) {
   toast('憑證已上傳');
 }
 
-function showWhatsAppReminders() {
+async function showSingleWaReminder(name, tel) {
+  if (!currentMeeting) return;
+  const cleanTel = (tel || '').replace(/[^0-9]/g, '');
+  const settings = await api('/settings');
+  const template = (settings.waReminderMsg || '您好 {name}，火炭會聚會溫馨提醒：您已出席 {date} 的聚會但尚未付款 (HK${fee})。請盡快安排，謝謝！🙏');
+  const fee = currentMeeting.guest_fee || currentMeeting.member_fee || 388;
+  const msg = template.replace(/\{name\}/g, name).replace(/\{date\}/g, currentMeeting.date).replace(/\{fee\}/g, fee);
+  const waLink = cleanTel ? 'https://wa.me/852' + cleanTel + '?text=' + encodeURIComponent(msg) : '';
+  showModal('💬 WhatsApp 追數 — ' + esc(name),
+    '<div style="margin-bottom:12px">' +
+    '<div style="font-size:13px;margin-bottom:4px">📱 <strong>' + esc(tel || '無電話') + '</strong></div>' +
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">出席：' + currentMeeting.date + ' · 未付金額：$' + fee + '</div>' +
+    '<div style="background:#f0fdf4;border:1px solid #a7f3d0;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;white-space:pre-wrap">' + esc(msg) + '</div>' +
+    (cleanTel
+      ? '<a href="' + waLink + '" target="_blank" class="btn btn-primary" style="width:100%;background:#25D366;color:#fff;font-size:15px;padding:12px;text-decoration:none;display:block;text-align:center;border-radius:8px">💬 以 WhatsApp 發送</a>' +
+        '<button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px" onclick="navigator.clipboard.writeText(\'' + esc(msg).replace(/'/g, "\\'") + '\');toast(\'已複製訊息\')">📋 複製訊息</button>'
+      : '<div style="color:#ef4444;font-size:13px">⚠️ 無電話號碼，無法發送 WhatsApp</div>'
+    ) +
+    '</div>'
+  );
+}
+
+async function showWhatsAppReminders() {
   if (!currentMeeting) return toast('請先選擇聚會');
   const attMap = {};
   meetingAttendance.forEach(a => { attMap[`${a.person_type}_${a.person_id}`] = a; });
@@ -1921,9 +2521,13 @@ function showWhatsAppReminders() {
 
   if (!unpaid.length) return toast('所有出席者已付款');
 
-  const msg = encodeURIComponent('您好，火炭會聚會溫馨提醒：您已出席 '+currentMeeting.date+' 的聚會但尚未付款 (HK$388)。請盡快安排，謝謝！🙏');
+  const settings = await api('/settings');
+  const template = (settings.waReminderMsg || '您好 {name}，火炭會聚會溫馨提醒：您已出席 {date} 的聚會但尚未付款 (HK${fee})。請盡快安排，謝謝！🙏');
+  const fee = currentMeeting.guest_fee || currentMeeting.member_fee || 388;
+  const baseMsg = template.replace(/\{date\}/g, currentMeeting.date).replace(/\{fee\}/g, fee);
   const links = unpaid.map(p => {
     const cleanTel = (p.tel || '').replace(/[^0-9]/g, '');
+    const msg = encodeURIComponent(baseMsg.replace(/\{name\}/g, p.name));
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'+
       '<span style="font-weight:600;font-size:13px">'+esc(p.name)+'</span>'+
       '<span style="font-size:11px;color:var(--text2)">📱 '+esc(p.tel||'—')+'</span>'+
@@ -1932,7 +2536,7 @@ function showWhatsAppReminders() {
   }).join('');
 
   var bulkUnpaid = unpaid.filter(p => (p.tel||'').replace(/[^0-9]/g,''));
-  window._bulkLinks = bulkUnpaid.map(p => 'https://wa.me/852'+(p.tel||'').replace(/[^0-9]/g,'')+'?text='+msg).join('\n');
+  window._bulkLinks = bulkUnpaid.map(p => 'https://wa.me/852'+(p.tel||'').replace(/[^0-9]/g,'')+'?text='+encodeURIComponent(baseMsg.replace(/\{name\}/g, p.name))).join('\n');
   window._bulkCount = bulkUnpaid.length;
 
   showModal('💬 WhatsApp 催款通知',

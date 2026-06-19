@@ -18,7 +18,7 @@ export async function onRequest(context) {
     if (!apiKey) return Response.json({ error: 'API key not configured' }, { status: 500, headers: cors });
 
     const result = await callQwen(env, messages, apiKey);
-    return Response.json({ reply: result.reply }, { headers: cors });
+    return Response.json({ reply: result.reply, tools_used: result.tools_used || [] }, { headers: cors });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500, headers: cors });
   }

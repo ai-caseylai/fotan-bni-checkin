@@ -25,7 +25,7 @@ export async function onRequest(context) {
       const body = await request.json();
       const { name, tel, email, fee_paid_date, professional, role } = body;
       if (!name) return Response.json({ error: 'Name required' }, { status: 400, headers: cors });
-      const result = await env.DB.prepare('INSERT INTO members (name, tel, email, fee_paid_date, professional, role, table_number) VALUES (?,?,?,?,?,?,?)').bind(name, tel || '', email || '', fee_paid_date || '', professional || '', role || '會員', body.table_number || '').run();
+      const result = await env.DB.prepare('INSERT INTO members (name, tel, email, fee_paid_date, professional, role, table_number, seat_order) VALUES (?,?,?,?,?,?,?,?)').bind(name, tel || '', email || '', fee_paid_date || '', professional || '', role || '會員', body.table_number || '', body.seat_order ?? null).run();
       if (body.bio) {
         await env.DB.prepare('UPDATE members SET bio=? WHERE id=?').bind(body.bio, result.meta.last_row_id).run();
       }
@@ -35,7 +35,7 @@ export async function onRequest(context) {
       if (!id) return Response.json({ error: 'ID required' }, { status: 400, headers: cors });
       const body = await request.json();
       const sets = [], vals = [];
-      for (const k of ['name','tel','email','fee_paid_date','professional','role','table_number','bio','active']) {
+      for (const k of ['name','tel','email','fee_paid_date','professional','role','table_number','seat_order','bio','active','tags']) {
         if (body[k] !== undefined) { sets.push(`${k}=?`); vals.push(body[k]); }
       }
       if (!sets.length) return Response.json({ error: 'No fields' }, { status: 400, headers: cors });
