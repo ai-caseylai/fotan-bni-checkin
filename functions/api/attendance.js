@@ -25,24 +25,42 @@ export async function onRequest(context) {
     }
     if (request.method === 'PUT') {
       const body = await request.json();
-      const { id, substitute, payment, payment_method, arrival_time, remark, table_number, seat_order, price_tier, _delete } = body;
+      const { id, _delete } = body;
       if (!id) return Response.json({ error: 'ID required' }, { status: 400, headers: cors });
       // Soft-delete via PUT (Cloudflare WAF 封鎖 DELETE method)
       if (_delete) {
         await env.DB.prepare('DELETE FROM attendance WHERE id=?').bind(id).run();
         return Response.json({ ok: true, deleted: true }, { headers: cors });
       }
+      // Only update fields that are present in the request body
+      const fieldDefs = [
+        { key: 'substitute', map: v => v || '' },
+        { key: 'payment', map: v => v || '' },
+        { key: 'payment_method', map: v => v || '' },
+        { key: 'arrival_time', map: v => v || '' },
+        { key: 'remark', map: v => v || '' },
+        { key: 'table_number', map: v => v || '' },
+        { key: 'seat_order', map: v => v ?? null },
+        { key: 'price_tier', map: v => v || '' }
+      ];
+      const sets = [], vals = [];
+      for (const fd of fieldDefs) {
+        if (body[fd.key] !== undefined) {
+          sets.push(fd.key + '=?');
+          vals.push(fd.map(body[fd.key]));
+        }
+      }
+      if (!sets.length) return Response.json({ ok: true }, { headers: cors });
       // 未付款不能簽到：如設定 arrival_time 且非 absent，必須已付費或免費
-      if (arrival_time && arrival_time !== 'absent') {
+      if (body.arrival_time && body.arrival_time !== 'absent') {
         const row = await env.DB.prepare('SELECT payment FROM attendance WHERE id=?').bind(id).first();
-        const effectivePayment = payment || (row ? row.payment : '');
+        const effectivePayment = body.payment || (row ? row.payment : '');
         if (effectivePayment !== 'paid' && effectivePayment !== 'free') {
           return Response.json({ error: '未付款不能簽到，請先完成付款' }, { status: 400, headers: cors });
         }
       }
-      await env.DB.prepare(
-        'UPDATE attendance SET substitute=?, payment=?, payment_method=?, arrival_time=?, remark=?, table_number=?, seat_order=?, price_tier=? WHERE id=?'
-      ).bind(substitute || '', payment || '', payment_method || '', arrival_time || '', remark || '', table_number || '', seat_order ?? null, price_tier || '', id).run();
+      vals.push(id);
+      await env.DB.prepare('UPDATE attendance SET ' + sets.join(',') + ' WHERE id=?').bind(...vals).run();
       return Response.json({ ok: true }, { headers: cors });
     }
     if (request.method === 'POST') {
