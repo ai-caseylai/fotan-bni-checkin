@@ -121,13 +121,24 @@ export async function onRequest(context) {
       if (!attendance_id) return Response.json({ ok: false, error: 'attendance_id required' }, { headers: cors });
       // 未付款不能簽到
       if (arrival_time && arrival_time !== 'absent') {
-        const row = await env.DB.prepare('SELECT payment FROM attendance WHERE id=?').bind(attendance_id).first();
+        const row = await env.DB.prepare('SELECT payment, table_number, seat_order, person_type, person_id FROM attendance WHERE id=?').bind(attendance_id).first();
         if (!row || (row.payment !== 'paid' && row.payment !== 'free')) {
           return Response.json({ ok: false, error: '未付款不能簽到，請先完成付款' }, { headers: cors });
         }
+        // Auto-fill table_number and seat_order from person record if missing
+        let tbl = row.table_number || '';
+        let seat = row.seat_order;
+        if (!tbl) {
+          const personTable = row.person_type === 'member' ? 'members' : 'guests';
+          const person = await env.DB.prepare(`SELECT table_number, seat_order FROM ${personTable} WHERE id=?`).bind(row.person_id).first();
+          if (person) { tbl = person.table_number || ''; seat = person.seat_order; }
+        }
+        await env.DB.prepare('UPDATE attendance SET arrival_time=?, table_number=?, seat_order=? WHERE id=?')
+          .bind(arrival_time, tbl, seat, attendance_id).run();
+      } else {
+        await env.DB.prepare('UPDATE attendance SET arrival_time=? WHERE id=?')
+          .bind(arrival_time || 'absent', attendance_id).run();
       }
-      await env.DB.prepare('UPDATE attendance SET arrival_time=? WHERE id=?')
-        .bind(arrival_time || 'absent', attendance_id).run();
       return Response.json({ ok: true, message: `已標記 attendance #${attendance_id} 為 ${arrival_time || 'absent'}` }, { headers: cors });
     }
 
