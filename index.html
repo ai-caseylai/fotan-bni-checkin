@@ -137,6 +137,7 @@ function init(){
 
 var tabFilter='unchecked';
 function switchTab(tab){
+  locked=false;last=null;
   tabFilter=tab;
   document.querySelectorAll('.tab-item').forEach(function(b){b.classList.toggle('active',b.id==='bar-'+tab)});
   render();
