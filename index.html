@@ -241,7 +241,7 @@ function allPeople(){
   var all=[];
   members.forEach(function(p){if(map['member_'+p.id])all.push({p:p,type:'member',label:'會員',att:map['member_'+p.id]})});
   guests.forEach(function(p){if(map['guest_'+p.id])all.push({p:p,type:'guest',label:'來賓',att:map['guest_'+p.id]})});
-  // Only show people with a table assignment in this meeting's attendance
+  // Show all people with a table assignment in this meeting
   all=all.filter(function(x){return !!(x.att&&x.att.table_number);});
   all.sort(function(a,b){return (a.p.name||'').localeCompare(b.p.name||'')});
   return all;
@@ -393,14 +393,19 @@ function doCheckin(type,id,name){
     return Promise.reject(new Error('已簽到'));
   }
   if(exist){
-    return A('/attendance',{method:'PUT',body:JSON.stringify({id:exist.id,arrival_time:time})}).then(function(r){return{name:name,time:time,payment:exist.payment,attId:exist.id,type:type,tbl:exist.table_number||''}});
+    var personList=type==='member'?members:guests;
+    var person=personList.find(function(p){return p.id===id});
+    var tbl=exist.table_number||(person?person.table_number||'':'');
+    var seat=exist.seat_order??(person?person.seat_order:null);
+    return A('/attendance',{method:'PUT',body:JSON.stringify({id:exist.id,arrival_time:time,table_number:tbl,seat_order:seat})}).then(function(r){return{name:name,time:time,payment:exist.payment,attId:exist.id,type:type,tbl:tbl}});
   }
   // New attendance record — get table from person record
   var personList2=type==='member'?members:guests;
   var person2=personList2.find(function(p){return p.id===id});
   var newTbl=person2?person2.table_number||'':'';
+  var newSeat=person2?person2.seat_order:null;
   var newPay=(type==='member')?'paid':'';
-  return A('/attendance',{method:'POST',body:JSON.stringify({meeting_id:meeting.id,person_type:type,person_id:id,arrival_time:time,payment:newPay})}).then(function(r){return{name:name,time:time,payment:newPay,attId:r.id,type:type,tbl:newTbl}});
+  return A('/attendance',{method:'POST',body:JSON.stringify({meeting_id:meeting.id,person_type:type,person_id:id,arrival_time:time,payment:newPay,table_number:newTbl,seat_order:newSeat})}).then(function(r){return{name:name,time:time,payment:newPay,attId:r.id,type:type,tbl:newTbl}});
 }
 
 function showAlipayQR(fee){

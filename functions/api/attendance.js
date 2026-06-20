@@ -47,14 +47,14 @@ export async function onRequest(context) {
     }
     if (request.method === 'POST') {
       const body = await request.json();
-      const { meeting_id, person_type, person_id, substitute, payment, payment_method, arrival_time, remark, seat_order } = body;
+      const { meeting_id, person_type, person_id, substitute, payment, payment_method, arrival_time, remark, table_number, seat_order } = body;
       // 未付款不能簽到
       if (arrival_time && arrival_time !== 'absent' && payment !== 'paid' && payment !== 'free') {
         return Response.json({ error: '未付款不能簽到，請先完成付款' }, { status: 400, headers: cors });
       }
       const result = await env.DB.prepare(
-        'INSERT INTO attendance (meeting_id, person_type, person_id, substitute, payment, payment_method, arrival_time, remark, seat_order) VALUES (?,?,?,?,?,?,?,?,?)'
-      ).bind(meeting_id, person_type, person_id, substitute || '', payment || '', payment_method || '', arrival_time || '', remark || '', seat_order ?? null).run();
+        'INSERT INTO attendance (meeting_id, person_type, person_id, substitute, payment, payment_method, arrival_time, remark, table_number, seat_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
+      ).bind(meeting_id, person_type, person_id, substitute || '', payment || '', payment_method || '', arrival_time || '', remark || '', table_number || '', seat_order ?? null).run();
       return Response.json({ id: result.meta.last_row_id }, { headers: cors });
     }
     if (request.method === 'DELETE') {
