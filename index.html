@@ -421,7 +421,13 @@ function showFPSQR(phone,fee){
   document.body.appendChild(ov);
 }
 function directCheckin(attId){
-  A('/attendance',{method:'PUT',body:JSON.stringify({id:attId,payment:'paid'})}).then(function(){
+  var now=new Date(),time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  var att=checked.find(function(a){return a.id===attId});
+  var personList=att?.(att.person_type==='member'?members:guests);
+  var person=personList?.find(function(p){return p.id===att.person_id});
+  var tbl=att?.table_number||(person?person.table_number||'':'');
+  var seat=att?.seat_order??(person?person.seat_order:null);
+  A('/attendance',{method:'PUT',body:JSON.stringify({id:attId,payment:'paid',arrival_time:time,table_number:tbl,seat_order:seat})}).then(function(){
     document.getElementById('main').innerHTML='<div class="result"><div style="font-size:48px;margin-bottom:16px">✅</div><div class="rname">簽到完成</div><div class="rtime">多謝光臨</div><button onclick="location.reload()" class="btn btn-primary" style="margin-top:20px">返回</button></div>';
     playSuccess();
   });
