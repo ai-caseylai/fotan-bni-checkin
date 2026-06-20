@@ -63,12 +63,12 @@ export async function onRequest(context) {
         }
 
         const result = await env.DB.prepare(
-          'INSERT INTO guests (name, professional, tel, invited_by, meeting_id) VALUES (?,?,?,?,?)'
-        ).bind(name, g.professional || '', g.tel || '', g.invited_by || '', mid).run();
+          'INSERT INTO guests (name, professional, tel, invited_by, meeting_id, table_number, seat_order) VALUES (?,?,?,?,?,?,?)'
+        ).bind(name, g.professional || '', g.tel || '', g.invited_by || '', mid, g.table_number || '', g.seat_order ?? null).run();
         const guestId = result.meta.last_row_id;
         await env.DB.prepare(
-          'INSERT INTO attendance (meeting_id, person_type, person_id, payment) VALUES (?,?,?,?)'
-        ).bind(mid, 'guest', guestId, payStatus).run();
+          'INSERT INTO attendance (meeting_id, person_type, person_id, payment, table_number, seat_order) VALUES (?,?,?,?,?,?)'
+        ).bind(mid, 'guest', guestId, payStatus, g.table_number || '', g.seat_order ?? null).run();
         added++;
         results.push({ name, status: 'added', payment: payStatus || 'unpaid', guest_id: guestId });
       }
@@ -421,7 +421,7 @@ export async function onRequest(context) {
 
     // ── create_guest ──────────────────────────────────
     if (action === 'create_guest') {
-      const { name, professional, tel, invited_by, meeting_id, vip, payment } = body;
+      const { name, professional, tel, invited_by, meeting_id, vip, payment, table_number, seat_order } = body;
       if (!name) return Response.json({ ok: false, error: 'name required' }, { headers: cors });
       const existG = await env.DB.prepare('SELECT id FROM guests WHERE name=? AND active=1').bind(name).first();
       const existM = await env.DB.prepare('SELECT id FROM members WHERE name=? AND active=1').bind(name).first();
@@ -429,12 +429,12 @@ export async function onRequest(context) {
       let mid = meeting_id;
       if (!mid) { const latest = await env.DB.prepare('SELECT id FROM meetings ORDER BY date DESC LIMIT 1').first(); mid = latest ? latest.id : null; }
       const result = await env.DB.prepare(
-        'INSERT INTO guests (name, professional, tel, invited_by, meeting_id, vip) VALUES (?,?,?,?,?,?)'
-      ).bind(name, professional || '', tel || '', invited_by || '', mid, vip ? 1 : 0).run();
+        'INSERT INTO guests (name, professional, tel, invited_by, meeting_id, vip, table_number, seat_order) VALUES (?,?,?,?,?,?,?,?)'
+      ).bind(name, professional || '', tel || '', invited_by || '', mid, vip ? 1 : 0, table_number || '', seat_order ?? null).run();
       const guestId = result.meta.last_row_id;
       if (mid) {
-        await env.DB.prepare('INSERT INTO attendance (meeting_id, person_type, person_id, payment) VALUES (?,?,?,?)')
-          .bind(mid, 'guest', guestId, payment || '').run();
+        await env.DB.prepare('INSERT INTO attendance (meeting_id, person_type, person_id, payment, table_number, seat_order) VALUES (?,?,?,?,?,?)')
+          .bind(mid, 'guest', guestId, payment || '', table_number || '', seat_order ?? null).run();
       }
       return Response.json({ ok: true, guest_id: guestId, meeting_id: mid, message: '已新增來賓：' + name }, { headers: cors });
     }
