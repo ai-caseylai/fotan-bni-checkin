@@ -89,7 +89,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 <div id="app">
 <div id="top"><h1>火炭會聚會 <span style="font-size:10px;opacity:.5">v3.0</span></h1><div id="sub"></div></div>
 <div id="main"></div>
-<div id="bar"><button id="bar-unchecked" class="tab-item active" onclick="switchTab('unchecked')"><span class="tab-icon">👥</span><span>未簽到</span></button><button id="bar-checked" class="tab-item" onclick="switchTab('checked')"><span class="tab-icon">✅</span><span>已簽到</span></button><button class="tab-item" onclick="showSchedule()"><span class="tab-icon">📋</span><span>流程</span></button><button class="tab-item" onclick="showProductIntro()"><span class="tab-icon">🏅</span><span>委員</span></button><button class="tab-item" onclick="showAboutUs()"><span class="tab-icon">ℹ️</span><span>關於</span></button></div>
+<div id="bar"><button id="bar-unchecked" class="tab-item active" onclick="switchTab('unchecked')"><span class="tab-icon">👥</span><span>未簽到</span></button><button id="bar-checked" class="tab-item" onclick="switchTab('checked')"><span class="tab-icon">✅</span><span>已簽到</span></button><button class="tab-item" onclick="showSchedule()"><span class="tab-icon">📋</span><span>流程</span></button></div>
 </div>
 <script>
 var API='/api';
@@ -98,12 +98,14 @@ var meeting=null,members=[],guests=[],checked=[],locked=false,last=null;
 var D={
   lunchFee:'388',paymeLink:'https://payme.hsbc/fotan',
   wcLink:'https://pay.weixin.qq.com/',aliLink:'https://www.alipayhk.com/',fpsPhone:'97188675',aliQrImg:'',fpsQrImg:'',
-  tableNumber:'8',productIntro:'',aboutUs:'',joinLink:'',skipCheckin:'1',
+  productIntro:'',aboutUs:'',joinLink:'',skipCheckin:'1',
   schedule:'12:30 報到及交流\n12:45 例會正式開始\n13:00 會員介紹 (30秒每位)\n13:20 專題分享\n13:40 來賓介紹\n14:00 商業引薦\n14:30 午宴及自由交流\n15:00 活動結束',
   chairmanMsg:'感謝您今天蒞臨火炭會聚會！\n期待每個月也可以見面！'
 };
 
 function E(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+var TN={};
+function T(tbl){if(!tbl)return'';var n=String(parseInt(tbl));return TN[n]||('第'+n+'號枱');}
 
 function A(p,o){return fetch(API+p,Object.assign({},o||{},{headers:(o&&o.body)?{'Content-Type':'application/json'}:{}})).then(function(r){return r.json()})}
 
@@ -124,6 +126,7 @@ function init(){
     }
     var prefix=meeting.date===today?'📅 ':'📅 [即將舉行] ';
     document.getElementById('sub').textContent=prefix+meeting.date+' '+(meeting.type==='regular'?'例會':meeting.type==='anniversary'?'週年聚餐':'特別會議');
+    A('/settings').then(function(s){if(s&&s['seating_names_'+meeting.id]){try{TN=JSON.parse(s['seating_names_'+meeting.id])}catch(e){}}});
     return Promise.all([A('/members'),A('/guests'),A('/attendance?meeting_id='+meeting.id)]);
   }).then(function(r){
     if(!r)return;
@@ -198,11 +201,14 @@ function showPersonCard(type, pid){
   var email=E(p.email||'');
   var role=E(p.role||'');
   var att = checked.find(function(a){return a.person_type===type&&a.person_id===pid});
-  var tbl=E((att&&att.table_number)?att.table_number:(p.table_number||''));
+  var tbl=(att&&att.table_number)?att.table_number:(p.table_number||'');
+  var seat=(att&&att.seat_order)?att.seat_order:(p.seat_order||'');
+  var tblName=T(tbl);
+  if(tblName&&seat)tblName+=' · '+seat+'號位';
   var label=type==='member'?'會員':type==='guest'?'來賓':'觀察員';
 
   var body='<div style="text-align:center;margin-bottom:12px"><div class="av '+type+'" style="width:56px;height:56px;font-size:22px;margin:0 auto 8px">'+name.charAt(0)+'</div><div style="font-size:20px;font-weight:700">'+name+'</div><div style="font-size:13px;color:var(--text2)">'+label+'</div></div>';
-  if(tbl) body+='<div style="text-align:center;margin-bottom:8px"><span style="background:var(--pri-light);color:var(--pri);padding:4px 14px;border-radius:12px;font-weight:700;font-size:14px">🍽 '+tbl+'號枱</span></div>';
+  if(tblName) body+='<div style="text-align:center;margin-bottom:8px"><span style="background:var(--pri-light);color:var(--pri);padding:4px 14px;border-radius:12px;font-weight:700;font-size:14px">🍽 '+tblName+'</span></div>';
   if(role&&role!=='會員') body+='<div style="padding:8px 0;font-size:15px">🏅 '+role+'</div>';
   if(prof) body+='<div style="padding:8px 0;font-size:15px">💼 '+prof+'</div>';
   var bio=E(p.bio||'');
@@ -235,6 +241,8 @@ function allPeople(){
   var all=[];
   members.forEach(function(p){if(map['member_'+p.id])all.push({p:p,type:'member',label:'會員',att:map['member_'+p.id]})});
   guests.forEach(function(p){if(map['guest_'+p.id])all.push({p:p,type:'guest',label:'來賓',att:map['guest_'+p.id]})});
+  // Only show people with a table assignment in this meeting's attendance
+  all=all.filter(function(x){return !!(x.att&&x.att.table_number);});
   all.sort(function(a,b){return (a.p.name||'').localeCompare(b.p.name||'')});
   return all;
 }
@@ -260,7 +268,7 @@ function render(){
       h+='<div style="font-size:48px;margin-bottom:16px">✅</div>';
       h+='<div style="font-size:14px;font-weight:700;color:var(--success);margin-bottom:4px">簽到確認</div>';
       h+='<div style="font-size:20px;font-weight:700;margin-bottom:4px">多謝光臨</div>';
-      h+='<div style="font-size:14px;color:var(--text2);margin-bottom:20px">🍽 '+(meeting&&meeting.table_number?E(meeting.table_number):E(D.tableNumber))+' 號枱</div>';
+      h+='<div style="font-size:14px;color:var(--text2);margin-bottom:20px">🍽 '+T(last.tbl)+'</div>';
       if(D.schedule)h+='<div class="card2"><h3>節目表</h3><div class="sched">'+sched+'</div></div>';
       if(D.chairmanMsg)h+='<div class="msg2">'+chair+'</div>';
       h+='</div>';
@@ -333,7 +341,10 @@ function renderRow(x){
     else payText='<span style="color:#ef4444;font-size:10px;font-weight:600;flex-shrink:0;margin-right:4px">未付款</span>';
   }
   var tblNum=(x.att&&x.att.table_number)?x.att.table_number:(x.p.table_number||'');
-  var tbl=tblNum?'<span class="tbl">'+E(tblNum)+'號枱</span>':'';
+  var seatNo=(x.att&&x.att.seat_order)?x.att.seat_order:(x.p.seat_order||'');
+  var tblLabel=tblNum?T(tblNum):'';
+  if(tblLabel&&seatNo)tblLabel+=' · '+seatNo+'號位';
+  var tbl=tblLabel?'<span class="tbl">'+E(tblLabel)+'</span>':'';
   return '<div class="row" data-type="'+x.type+'" data-id="'+x.p.id+'" data-name="'+E(x.p.name)+'" data-label="'+x.label+'"><div class="av '+x.type+'">'+E(x.p.name.charAt(0))+'</div><div class="info"><div class="n">'+E(x.p.name)+'</div><div class="m">'+E(meta)+'</div></div>'+payText+tbl+'</div>';
 }
 
@@ -343,7 +354,7 @@ function showConfirm(type,id,name,label){
   var isUnpaid=att&&(!att.payment||att.payment==='unpaid');
   if(isUnpaid){
     locked=true;
-    last={name:name,time:'',payment:'unpaid',attId:att.id,type:type};
+    last={name:name,time:'',payment:'unpaid',attId:att.id,type:type,tbl:att.table_number||''};
     render();
     return;
   }
@@ -382,10 +393,14 @@ function doCheckin(type,id,name){
     return Promise.reject(new Error('已簽到'));
   }
   if(exist){
-    return A('/attendance',{method:'PUT',body:JSON.stringify({id:exist.id,arrival_time:time})}).then(function(r){return{name:name,time:time,payment:exist.payment,attId:exist.id,type:type}});
+    return A('/attendance',{method:'PUT',body:JSON.stringify({id:exist.id,arrival_time:time})}).then(function(r){return{name:name,time:time,payment:exist.payment,attId:exist.id,type:type,tbl:exist.table_number||''}});
   }
-  // New attendance record
-  return A('/attendance',{method:'POST',body:JSON.stringify({meeting_id:meeting.id,person_type:type,person_id:id,arrival_time:time,payment:pay})}).then(function(r){return{name:name,time:time,payment:pay,attId:r.id,type:type}});
+  // New attendance record — get table from person record
+  var personList2=type==='member'?members:guests;
+  var person2=personList2.find(function(p){return p.id===id});
+  var newTbl=person2?person2.table_number||'':'';
+  var newPay=(type==='member')?'paid':'';
+  return A('/attendance',{method:'POST',body:JSON.stringify({meeting_id:meeting.id,person_type:type,person_id:id,arrival_time:time,payment:newPay})}).then(function(r){return{name:name,time:time,payment:newPay,attId:r.id,type:type,tbl:newTbl}});
 }
 
 function showAlipayQR(fee){

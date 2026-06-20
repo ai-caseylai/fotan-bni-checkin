@@ -33,10 +33,10 @@ var L = {
   aliLink: 'https://www.alipayhk.com/',
   wcQrImg: '',
   aliQrImg: '',
-  tableNumber: '8',
   schedule: '12:30 報到及交流\n12:45 例會正式開始\n13:00 會員介紹 (30秒每位)\n13:20 專題分享\n13:40 來賓介紹\n14:00 商業引薦\n14:30 午宴及自由交流\n15:00 活動結束',
   chairmanMsg: '感謝您今天蒞臨火炭會聚會！\n期待每個月也可以見面！'
 };
+var tableNames = {};
 
 document.addEventListener('DOMContentLoaded', function() {
   init();
@@ -60,6 +60,16 @@ async function init() {
   var meetings = await api('/meetings');
   var today = new Date().toISOString().split('T')[0];
   todayMeeting = meetings.find(function(m) { return m.date === today; });
+
+  // Load table names for today's meeting
+  if (todayMeeting) {
+    try {
+      var tn = await api('/settings');
+      if (tn && tn['seating_names_'+todayMeeting.id]) {
+        tableNames = JSON.parse(tn['seating_names_'+todayMeeting.id]);
+      }
+    } catch(e) {}
+  }
 
   if (!todayMeeting) {
     document.getElementById('top-bar').innerHTML = '<h1>'+esc(L.title)+'</h1><div class="date">'+L.checkin+'</div>';
@@ -98,7 +108,7 @@ function renderAllPeople() {
   if (locked) {
     var dbg = document.createElement('div');
     dbg.id = 'dbg'; dbg.style.cssText = 'position:fixed;bottom:54px;left:0;right:0;background:#0f172a;color:#22d3ee;font-size:10px;font-family:monospace;padding:6px;z-index:999;line-height:1.4;max-height:120px;overflow-y:auto';
-    dbg.innerHTML = '🐛 payme=['+String(L.paymeLink).slice(0,30)+'] wc=['+String(L.wcLink).slice(0,30)+'] ali=['+String(L.aliLink).slice(0,30)+']<br>chair=['+String(L.chairmanMsg).slice(0,30)+'] sched=['+String(L.schedule).slice(0,30)+']<br>tbl='+L.tableNumber+' fee='+L.lunchFee;
+    dbg.innerHTML = '🐛 payme=['+String(L.paymeLink).slice(0,30)+'] wc=['+String(L.wcLink).slice(0,30)+'] ali=['+String(L.aliLink).slice(0,30)+']<br>chair=['+String(L.chairmanMsg).slice(0,30)+'] sched=['+String(L.schedule).slice(0,30)+']<br>tbl='+(lastResult?lastResult.tableNumber:'')+' fee='+L.lunchFee;
     document.body.appendChild(dbg);
     if (lastResult) {
       var paid = lastResult.payment && lastResult.payment !== 'unpaid' && lastResult.payment !== '';
@@ -111,7 +121,7 @@ function renderAllPeople() {
           '<div style="font-size:16px;color:#0d9488;font-weight:600;margin-bottom:20px">'+esc(lastResult.time)+'</div>'+
           '<div style="display:inline-block;padding:10px 28px;border-radius:12px;font-size:18px;font-weight:700;background:#d1fae5;color:#065f46;margin-bottom:24px">'+L.paidTri+'</div>'+
           '<div style="background:#f0fdfa;border-radius:16px;padding:24px;margin:0 12px">'+
-            '<div style="font-size:15px;color:#0d9488;font-weight:700;margin-bottom:8px">🍽 '+esc(L.tableNumber)+' 號枱 · 午宴資訊</div>'+
+            '<div style="font-size:15px;color:#0d9488;font-weight:700;margin-bottom:8px">🍽 '+esc(getTableName(lastResult.tableNumber))+' · 午宴資訊</div>'+
             (L.schedule ? '<div style="text-align:left;font-size:13px;color:#0f766e;line-height:1.8;margin-top:8px;white-space:pre-line">'+esc(L.schedule)+'</div>' : '')+
           '</div>'+
           (L.chairmanMsg ? '<div style="margin-top:16px;padding:16px;background:#fff;border-radius:12px;text-align:center;font-size:14px;color:#475569;line-height:1.8;white-space:pre-line">💬 '+esc(L.chairmanMsg)+'</div>' : '')+
@@ -230,6 +240,12 @@ function showConfirm(type, id, name, label) {
   overlay.addEventListener('click', function(e) { if (e.target === overlay) cleanup(); });
 }
 
+function getTableName(tbl) {
+  if (!tbl) return '';
+  var n = String(parseInt(tbl));
+  return tableNames[n] || ('第 ' + n + ' 號枱');
+}
+
 async function doCheckin(type, id, name) {
   var existing = checkedIn.find(function(a) { return a.person_type === type && a.person_id === id; });
   if (existing) return;
@@ -241,10 +257,15 @@ async function doCheckin(type, id, name) {
     var paid = payment && payment !== 'unpaid' && payment !== '';
     row.querySelector('.info').insertAdjacentHTML('afterend', '<div class="pbadge"><span class="time">'+time+'</span><span class="pay '+(paid?'pay-paid':'pay-unpaid')+'">'+(paid?L.paid:L.unpaid)+'</span></div>');
   }
+  // Get person's table_number from their member/guest record
+  var personTbl = '';
+  var personList = type === 'member' ? members : (type === 'guest' ? guests : observers);
+  var person = personList.find(function(p) { return p.id === id; });
+  if (person && person.table_number) personTbl = String(parseInt(person.table_number));
   var result = await api('/attendance', { method: 'POST',
     body: JSON.stringify({ meeting_id: todayMeeting.id, person_type: type, person_id: id, arrival_time: time, payment: payment })
   });
-  return { name: name, time: time, payment: payment, attId: result.id };
+  return { name: name, time: time, payment: payment, attId: result.id, tableNumber: personTbl };
 }
 
 async function markAsPaid(attId) {
