@@ -1976,7 +1976,13 @@ async function saveCheckinOp() {
     const payload = { meeting_id: currentMeeting.id, ...att };
     // 未付款不清除 arrival_time
     if (!isPaidOrFree(att.payment)) delete payload.arrival_time;
-    await api('/attendance', { method: 'POST', body: JSON.stringify(payload) });
+    if (att.id) {
+      // 更新現有記錄，避免重複 insert
+      await api('/attendance', { method: 'PUT', body: JSON.stringify(payload) });
+    } else {
+      const r = await api('/attendance', { method: 'POST', body: JSON.stringify(payload) });
+      if (r && r.id) att.id = r.id;
+    }
   }
   toast('簽到記錄已儲存！');
 }

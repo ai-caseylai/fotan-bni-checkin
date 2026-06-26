@@ -302,7 +302,6 @@ export async function onRequest(context) {
         await env.DB.prepare('UPDATE members SET active=0 WHERE id=?').bind(person_id).run();
       } else {
         await env.DB.prepare('UPDATE guests SET active=0 WHERE id=?').bind(person_id).run();
-        await env.DB.prepare('DELETE FROM attendance WHERE person_type=? AND person_id=?').bind(person_type, person_id).run();
       }
       return Response.json({ ok: true, message: '已刪除 ' + person_type + ' #' + person_id }, { headers: cors });
     }
@@ -372,8 +371,9 @@ export async function onRequest(context) {
     if (action === 'delete_attendance') {
       const { attendance_id } = body;
       if (!attendance_id) return Response.json({ ok: false, error: 'attendance_id required' }, { headers: cors });
-      await env.DB.prepare('DELETE FROM attendance WHERE id=?').bind(attendance_id).run();
-      return Response.json({ ok: true, message: '已刪除 attendance #' + attendance_id }, { headers: cors });
+      // Soft-clear: 清除簽到相關欄位但保留付款記錄
+      await env.DB.prepare('UPDATE attendance SET arrival_time=NULL, table_number=NULL, seat_order=NULL, substitute=NULL, remark=NULL WHERE id=?').bind(attendance_id).run();
+      return Response.json({ ok: true, message: '已清除 attendance #' + attendance_id }, { headers: cors });
     }
 
     // ── delete_attendance_batch ──────────────────────
@@ -382,10 +382,10 @@ export async function onRequest(context) {
       if (!ids || !Array.isArray(ids) || !ids.length) return Response.json({ ok: false, error: 'ids array required' }, { headers: cors });
       let deleted = 0;
       for (const id of ids) {
-        await env.DB.prepare('DELETE FROM attendance WHERE id=?').bind(id).run();
+        await env.DB.prepare('UPDATE attendance SET arrival_time=NULL, table_number=NULL, seat_order=NULL, substitute=NULL, remark=NULL WHERE id=?').bind(id).run();
         deleted++;
       }
-      return Response.json({ ok: true, message: '已刪除 ' + deleted + ' 條 attendance records', deleted }, { headers: cors });
+      return Response.json({ ok: true, message: '已清除 ' + deleted + ' 條 attendance records', deleted }, { headers: cors });
     }
 
     // ── delete_meeting ────────────────────────────────
