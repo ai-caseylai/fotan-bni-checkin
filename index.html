@@ -89,16 +89,16 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 <div id="app">
 <div id="top"><h1>火炭會聚會 <span style="font-size:10px;opacity:.5">v3.0</span></h1><div id="sub"></div></div>
 <div id="main"></div>
-<div id="bar"><button id="bar-unchecked" class="tab-item active" onclick="switchTab('unchecked')"><span class="tab-icon">👥</span><span>未簽到</span></button><button id="bar-checked" class="tab-item" onclick="switchTab('checked')"><span class="tab-icon">✅</span><span>已簽到</span></button><button class="tab-item" onclick="showSchedule()"><span class="tab-icon">📋</span><span>流程</span></button></div>
+<div id="bar"><button id="bar-unchecked" class="tab-item active" onclick="switchTab('unchecked')"><span class="tab-icon">👥</span><span>未簽到</span></button><button id="bar-checked" class="tab-item" onclick="switchTab('checked')"><span class="tab-icon">✅</span><span>已簽到</span></button><button class="tab-item" onclick="showSchedule()"><span class="tab-icon">📋</span><span>流程</span></button><button class="tab-item" onclick="showGame()"><span class="tab-icon">🎮</span><span>遊戲</span></button><button class="tab-item" onclick="showProductIntro()"><span class="tab-icon">🏅</span><span>委員介紹</span></button><button class="tab-item" onclick="showAlbum()"><span class="tab-icon">📸</span><span>相簿</span></button></div>
 </div>
 <script>
 var API='/api';
-var meeting=null,members=[],guests=[],checked=[],locked=false,last=null;
+var meeting=null,members=[],guests=[],checked=[],locked=false,last=null,searchQ='';
 
 var D={
   lunchFee:'388',paymeLink:'https://payme.hsbc/fotan',
   wcLink:'https://pay.weixin.qq.com/',aliLink:'https://www.alipayhk.com/',fpsPhone:'97188675',aliQrImg:'',fpsQrImg:'',
-  productIntro:'',aboutUs:'',joinLink:'',skipCheckin:'1',
+  productIntro:'',gameInfo:'',albumLink:'',aboutUs:'',joinLink:'',skipCheckin:'1',
   schedule:'12:30 報到及交流\n12:45 例會正式開始\n13:00 會員介紹 (30秒每位)\n13:20 專題分享\n13:40 來賓介紹\n14:00 商業引薦\n14:30 午宴及自由交流\n15:00 活動結束',
   chairmanMsg:'感謝您今天蒞臨火炭會聚會！\n期待每個月也可以見面！'
 };
@@ -106,6 +106,7 @@ var D={
 function E(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML}
 var TN={};
 function T(tbl){if(!tbl)return'';var n=String(parseInt(tbl));return TN[n]||('第'+n+'號枱');}
+function C(n,v,d){if(v===undefined){var m=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)');return m?decodeURIComponent(m[2]):null}var e='';if(d){var t=new Date();t.setTime(t.getTime()+d*86400000);e=';expires='+t.toUTCString()}document.cookie=n+'='+encodeURIComponent(v)+e+';path=/;SameSite=Lax'}
 
 function A(p,o){return fetch(API+p,Object.assign({},o||{},{headers:(o&&o.body)?{'Content-Type':'application/json'}:{}})).then(function(r){return r.json()})}
 
@@ -131,6 +132,9 @@ function init(){
   }).then(function(r){
     if(!r)return;
     members=r[0];guests=r[1];checked=r[2];locked=false;
+    // Check cookie for previous check-in
+    var ck=C('fotan_ci');
+    if(ck){try{var ci=JSON.parse(ck);if(ci.mid===meeting.id){locked=true;last=ci;}}catch(e){}}
     render();
   });
 }
@@ -139,6 +143,7 @@ var tabFilter='unchecked';
 function switchTab(tab){
   locked=false;last=null;
   tabFilter=tab;
+  searchQ='';
   document.querySelectorAll('.tab-item').forEach(function(b){b.classList.toggle('active',b.id==='bar-'+tab)});
   render();
 }
@@ -156,6 +161,19 @@ function showChairmanMsg(){
 function showProductIntro(){
   var msg=D.productIntro||'暫無委員介紹';
   showInfoModal('🏅 委員介紹', msg.replace(/\n/g,'<br>'));
+}
+
+function showGame(){
+  var msg=D.gameInfo||'暫無遊戲資訊';
+  showInfoModal('🎮 遊戲', msg.replace(/\n/g,'<br>'));
+}
+
+function showAlbum(){
+  if(D.albumLink){
+    window.open(D.albumLink,'_blank');
+  } else {
+    showInfoModal('📸 相簿', '相簿連結尚未設定');
+  }
 }
 
 function playBeep(freq, dur, type){
@@ -269,7 +287,7 @@ function render(){
       h+='<div style="font-size:48px;margin-bottom:16px">✅</div>';
       h+='<div style="font-size:14px;font-weight:700;color:var(--success);margin-bottom:4px">簽到確認</div>';
       h+='<div style="font-size:20px;font-weight:700;margin-bottom:4px">多謝光臨</div>';
-      h+='<div style="font-size:14px;color:var(--text2);margin-bottom:20px">🍽 '+T(last.tbl)+'</div>';
+      h+='<div style="font-size:14px;color:var(--text2);margin-bottom:20px">'+(last.tbl?'🍽 '+T(last.tbl):'')+'</div>';
       if(D.schedule)h+='<div class="card2"><h3>節目表</h3><div class="sched">'+sched+'</div></div>';
       if(D.chairmanMsg)h+='<div class="msg2">'+chair+'</div>';
       h+='</div>';
@@ -317,8 +335,21 @@ if(D.aliLink)h+='<a href="javascript:void(0)" onclick="showAlipayQR('+fee+')" st
       });
     });
   } else {
-    main.innerHTML='<div class="hdr"><span>未簽到嘉賓</span><span class="cnt">'+all.length+' / '+total+'</span></div>'+
-      all.map(function(x){return renderRow(x);}).join('');
+    // Filter by search query
+    var filtered=all;
+    if(searchQ){
+      var q=searchQ.toLowerCase();
+      filtered=all.filter(function(x){
+        return (x.p.name||'').toLowerCase().indexOf(q)!==-1 ||
+          (x.p.professional||'').toLowerCase().indexOf(q)!==-1 ||
+          (x.p.tel||'').indexOf(searchQ)!==-1 ||
+          (x.p.role||'').toLowerCase().indexOf(q)!==-1 ||
+          (x.p.email||'').toLowerCase().indexOf(q)!==-1;
+      });
+    }
+    main.innerHTML='<div class="hdr"><span>未簽到嘉賓</span><span class="cnt">'+filtered.length+' / '+total+'</span></div>'+
+      '<div style="padding:8px 16px"><input id="search-input" type="text" placeholder="搜尋名字/電話/行業/職位..." value="'+E(searchQ)+'" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;outline:none;background:var(--bg)" oninput="searchQ=this.value;render()"></div>'+
+      filtered.map(function(x){return renderRow(x);}).join('');
     main.querySelectorAll('.row').forEach(function(row){
       row.addEventListener('click',function(){
         if(locked)return;
@@ -372,7 +403,9 @@ function showConfirm(type,id,name,label){
     document.getElementById('by').textContent='處理中...';
     doCheckin(type,id,name).then(function(r){
       if(!r){clean();return;}
-      locked=true;last=r;clean();render();playSuccess();
+      locked=true;last=r;clean();
+      C('fotan_ci',JSON.stringify({name:r.name,time:r.time,payment:r.payment,attId:r.attId,tbl:r.tbl,mid:meeting.id}),1);
+      render();playSuccess();
     }).catch(function(e){
       alert(e&&e.message==='已簽到'?'此人已簽到，請勿重複簽到':'簽到失敗，請重試');
       clean();
