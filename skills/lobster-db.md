@@ -1,9 +1,9 @@
 ---
 name: fotan-skill
-description: 火炭會聚會簽到系統 v3.11 — 31 Skill Actions · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
+description: 火炭會聚會簽到系統 v3.13 — 31 Skill Actions · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
 ---
 
-# 火炭會 Skill v3.11
+# 火炭會 Skill v3.13
 
 ## Token 驗證
 ```bash
@@ -48,12 +48,13 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
 ```
 支援欄位：name, tel, email, professional, role, fee_paid_date, bio, tags, table_number, seat_order, active
 
-### delete_person — 刪除人員（軟刪除 active=0）
+### delete_person — 刪除人員（軟刪除 active=0，保留 attendance 同付款記錄）
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"delete_person","person_type":"member","person_id":1}'
 ```
+member 同 guest 一致：只 set active=0，attendance + payment 全部保留。
 
 ---
 
@@ -89,12 +90,13 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
 ```
 支援欄位：name, professional, tel, invited_by, meeting_id, vip, table_number, seat_order, active
 
-### delete_person — 刪除來賓（同上）
+### delete_person — 刪除來賓（同上，保留 attendance 同付款記錄）
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"delete_person","person_type":"guest","person_id":15}'
 ```
+只 set active=0，attendance 同 payment 全保留（與 member 一致）。
 
 ---
 
@@ -182,19 +184,21 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -d '{"token":"TOKEN","action":"payment_summary"}'
 ```
 
-### delete_attendance — 刪除單條 attendance
+### delete_attendance — 清除單條 attendance（保留付款記錄）
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"delete_attendance","attendance_id":495}'
 ```
+⚠️ 軟清除：清 attendance 欄位（arrival_time, table_number, seat_order）但保留 payment/payment_method，唔會 delete row。
 
-### delete_attendance_batch — 批次刪除 attendance
+### delete_attendance_batch — 批次清除 attendance（保留付款記錄）
 ```bash
 curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"delete_attendance_batch","ids":[495,496,497]}'
 ```
+⚠️ 同上，軟清除保留付款資料。
 
 ---
 
@@ -316,6 +320,9 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
 - **未付款不能簽到**：payment≠paid 且≠free 時 mark_arrival 拒絕
 - **排位 ≠ 簽到**：排位只 update table_number + seat_order，永不改 payment，永不 create attendance
 - **Revenue**：自動檢查 member.role，委員計 committee_fee（default $220）
+- **delete_attendance**：軟清除（UPDATE SET NULL）attendance 欄位，保留 payment + payment_method
+- **delete_person**：member 同 guest 都只 set active=0，唔刪 attendance，保留付款歷史
+- **delete_meeting**：hard DELETE 會議 + 所有 attendance（⚠️ 會清走付款記錄，謹慎使用）
 - **Admin DELETE**：Cloudflare WAF 封鎖 DELETE method，admin 後台改用 PUT {active:0} 軟刪除
 - **Skill API**：全部用 POST，唔受 WAF 封鎖影響
 
