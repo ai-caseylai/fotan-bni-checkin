@@ -2748,7 +2748,9 @@ async function loadWaCerts() {
       <td style="max-width:160px;white-space:pre-wrap;word-break:break-word">${esc(r.comment||'—')}</td>
       <td style="font-size:11px">${esc((r.created_at||'').substring(0,16))}</td>
       <td>
-        <button class="btn btn-sm" style="background:#3b82f6;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="showLinkCertModal(${r.id})">關聯來賓</button>
+        ${r.person_name
+          ? `<button class="btn btn-sm" style="background:#f59e0b;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="unlinkWaCert(${r.id})">取消關聯</button>`
+          : `<button class="btn btn-sm" style="background:#3b82f6;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="showLinkCertModal(${r.id})">關聯來賓</button>`}
         <button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button>
       </td>
     </tr>`).join('');
@@ -2759,6 +2761,18 @@ function deleteWaCert(id) {
   if (!confirm('確定刪除此憑證？')) return;
   fetch('/api/whatsapp-cert?id='+id, { method: 'DELETE' }).then(r => r.json()).then(d => {
     if (d.ok) { toast('已刪除'); loadWaCerts(); }
+  });
+}
+
+function unlinkWaCert(id) {
+  if (!confirm('確定取消關聯？')) return;
+  fetch('/api/whatsapp-cert', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, person_type: '', person_id: 0, person_name: '' })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { toast('已取消關聯'); loadWaCerts(); }
+    else { toast('失敗: ' + (d.error||'')); }
   });
 }
 
