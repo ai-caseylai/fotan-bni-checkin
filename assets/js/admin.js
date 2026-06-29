@@ -78,7 +78,7 @@ function switchPage(page) {
   document.querySelectorAll('.sb-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.getElementById('topbar-title').textContent = {
     overview: '總覽', meetings: '會議管理', members: '會員管理',
-    guests: '來賓管理', seating: '餐桌排位', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練', wacert: 'WhatsApp憑證', skill: '火炭會 Skill'
+    guests: '來賓管理', seating: '餐桌排位', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練', wacert: '入錢憑證', skill: '火炭會 Skill'
   }[page] || '';
   if (page !== 'checkin') { clearInterval(ciPollTimer); ciPollTimer = null; }
   loadPage(page).catch(function(e) {
@@ -2721,9 +2721,9 @@ function formatFileSize(bytes) {
   return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-// ── WhatsApp 憑證 Page ─────────────────────────────
+// ── 入錢憑證 Page ─────────────────────────────
 async function renderWaCertPage(pc) {
-  pc.innerHTML = `<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">📱 WhatsApp憑證</h2>
+  pc.innerHTML = `<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">💰 入錢憑證</h2>
     <div class="panel">
       <div class="panel-header"><h2>📋 憑證列表</h2></div>
       <div class="panel-body" style="padding:0">
