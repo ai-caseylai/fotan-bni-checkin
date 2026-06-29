@@ -9,6 +9,14 @@ export async function onRequest(context) {
 
   const url = new URL(request.url);
 
+  async function verifyToken(token) {
+    if (!token) return null;
+    const row = await env.DB.prepare(
+      "SELECT * FROM skill_tokens WHERE token=? AND active=1 AND expires_at > datetime('now')"
+    ).bind(token).first();
+    return row || null;
+  }
+
   try {
     // GET — list all
     if (request.method === 'GET') {
@@ -35,10 +43,13 @@ export async function onRequest(context) {
       return Response.json({ ok: true }, { headers: cors });
     }
 
-    // POST — create (base64 photo)
+    // POST — create (base64 photo) — requires valid token
     if (request.method === 'POST') {
       const body = await request.json();
-      const { from_number, data, comment, note } = body;
+      const { token, from_number, data, comment, note } = body;
+      if (!token) return Response.json({ error: 'token required' }, { status: 401, headers: cors });
+      const tok = await verifyToken(token);
+      if (!tok) return Response.json({ error: 'invalid or expired token' }, { status: 401, headers: cors });
       if (!from_number) return Response.json({ error: 'from_number required' }, { status: 400, headers: cors });
       if (!data) return Response.json({ error: 'data (base64 photo) required' }, { status: 400, headers: cors });
 
