@@ -78,7 +78,7 @@ function switchPage(page) {
   document.querySelectorAll('.sb-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.getElementById('topbar-title').textContent = {
     overview: '總覽', meetings: '會議管理', members: '會員管理',
-    guests: '來賓管理', seating: '餐桌排位', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練', skill: '火炭會 Skill'
+    guests: '來賓管理', seating: '餐桌排位', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練', wacert: 'WhatsApp憑證', skill: '火炭會 Skill'
   }[page] || '';
   if (page !== 'checkin') { clearInterval(ciPollTimer); ciPollTimer = null; }
   loadPage(page).catch(function(e) {
@@ -98,6 +98,7 @@ async function loadPage(page) {
     case 'settings': await renderSettingsPage(pc); break;
     case 'qatraining': await renderQATraining(pc); break;
     case 'docs': renderDocsPage(pc); break;
+    case 'wacert': await renderWaCertPage(pc); break;
     case 'skill': await renderSkillPage(pc); break;
   }
 }
@@ -2718,6 +2719,44 @@ function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ── WhatsApp 憑證 Page ─────────────────────────────
+async function renderWaCertPage(pc) {
+  pc.innerHTML = `<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">📱 WhatsApp憑證</h2>
+    <div class="panel">
+      <div class="panel-header"><h2>📋 憑證列表</h2></div>
+      <div class="panel-body" style="padding:0">
+        <table class="data-table">
+          <thead><tr><th>縮圖</th><th>發送號碼</th><th>相片備註</th><th>文字備註</th><th>日期</th><th></th></tr></thead>
+          <tbody id="wacert-list"><tr><td colspan="6">載入中...</td></tr></tbody>
+        </table>
+      </div>
+    </div>`;
+  loadWaCerts();
+}
+
+async function loadWaCerts() {
+  try {
+    const rows = await fetch('/api/whatsapp-cert').then(r => r.json());
+    const el = document.getElementById('wacert-list');
+    if (!rows.length) { el.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2)">暫無憑證</td></tr>'; return; }
+    el.innerHTML = rows.map(r => `<tr>
+      <td>${r.r2_key ? `<a href="/api/image?name=${esc(r.r2_key)}" target="_blank"><img src="/api/image?name=${esc(r.r2_key)}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border)"></a>` : '—'}</td>
+      <td>${esc(r.from_number||'—')}</td>
+      <td style="max-width:200px;white-space:pre-wrap;word-break:break-word">${esc(r.comment||'—')}</td>
+      <td style="max-width:200px;white-space:pre-wrap;word-break:break-word">${esc(r.note||'—')}</td>
+      <td style="font-size:11px">${esc((r.created_at||'').substring(0,16))}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button></td>
+    </tr>`).join('');
+  } catch(e) { document.getElementById('wacert-list').innerHTML = '<tr><td colspan="6">載入失敗</td></tr>'; }
+}
+
+function deleteWaCert(id) {
+  if (!confirm('確定刪除此憑證？')) return;
+  fetch('/api/whatsapp-cert?id='+id, { method: 'DELETE' }).then(r => r.json()).then(d => {
+    if (d.ok) { toast('已刪除'); loadWaCerts(); }
+  });
 }
 
 // ── Docs Page ────────────────────────────────────
