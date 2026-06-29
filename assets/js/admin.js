@@ -2795,7 +2795,9 @@ async function showLinkCertModal(certId) {
   modal.onclick = e => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `<div class="modal-dialog" style="max-width:480px">
     <h3>🔗 關聯憑證到來賓</h3>
-    <div id="link-cert-list" style="max-height:400px;overflow-y:auto">
+    <input type="text" id="link-cert-search" placeholder="搜尋姓名或電話..." style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:12px;outline:none"
+           oninput="filterLinkCertList()">
+    <div id="link-cert-list" style="max-height:340px;overflow-y:auto">
       <div style="text-align:center;color:var(--text2);padding:20px">載入中...</div>
     </div>
     <div style="margin-top:16px;text-align:right">
@@ -2806,23 +2808,40 @@ async function showLinkCertModal(certId) {
 
   try {
     const data = await fetch('/api/whatsapp-cert?missing=1').then(r => r.json());
+    window._linkCertPeople = data.people || [];
+    window._linkCertId = certId;
     const el = document.getElementById('link-cert-list');
-    if (!data.people || !data.people.length) {
+    if (!window._linkCertPeople.length) {
       el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px">暫無未關聯來賓</div>';
       return;
     }
-    el.innerHTML = data.people.map(p => `
-      <div style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-radius:6px;margin:2px 0"
-           onclick="linkCertToPerson(${certId},'${p.person_type}',${p.person_id},'${esc(p.name)}')"
-           onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
-        <div>
-          <div style="font-weight:600;font-size:13px">${esc(p.name)}</div>
-          <div style="font-size:11px;color:var(--text2)">${esc(p.tel||'無電話')} · ${p.payment==='paid'?'已付款':'未付款'}</div>
-        </div>
-        <span style="color:var(--text3);font-size:18px">›</span>
-      </div>
-    `).join('');
+    renderLinkCertList(window._linkCertPeople);
   } catch(e) { document.getElementById('link-cert-list').innerHTML = '<div style="text-align:center;color:#ef4444;padding:20px">載入失敗</div>'; }
+}
+
+function filterLinkCertList() {
+  const q = (document.getElementById('link-cert-search')?.value || '').toLowerCase();
+  const filtered = (window._linkCertPeople || []).filter(p =>
+    p.name.toLowerCase().includes(q) || (p.tel || '').replace(/[^0-9]/g, '').includes(q.replace(/[^0-9]/g, ''))
+  );
+  renderLinkCertList(filtered);
+}
+
+function renderLinkCertList(people) {
+  const el = document.getElementById('link-cert-list');
+  if (!el) return;
+  if (!people.length) { el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px">無匹配結果</div>'; return; }
+  el.innerHTML = people.map(p => `
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-radius:6px;margin:2px 0"
+         onclick="linkCertToPerson(${window._linkCertId},'${p.person_type}',${p.person_id},'${esc(p.name)}')"
+         onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
+      <div>
+        <div style="font-weight:600;font-size:13px">${esc(p.name)}</div>
+        <div style="font-size:11px;color:var(--text2)">${esc(p.tel||'無電話')} · ${p.payment==='paid'?'已付款':'未付款'}</div>
+      </div>
+      <span style="color:var(--text3);font-size:18px">›</span>
+    </div>
+  `).join('');
 }
 
 async function linkCertToPerson(certId, personType, personId, personName) {
