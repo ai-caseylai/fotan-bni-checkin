@@ -2750,8 +2750,8 @@ async function loadWaCerts() {
       <td>
         ${r.person_name
           ? `<button class="btn btn-sm" style="background:#f59e0b;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="unlinkWaCert(${r.id})">取消關聯</button>`
-          : `<button class="btn btn-sm" style="background:#3b82f6;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="showLinkCertModal(${r.id})">關聯來賓</button>`}
-        <button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button>
+          : `<button class="btn btn-sm" style="background:#3b82f6;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="showLinkCertModal(${r.id})">關聯來賓</button>
+             <button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button>`}
       </td>
     </tr>`).join('');
   } catch(e) { document.getElementById('wacert-list').innerHTML = '<tr><td colspan="6">載入失敗</td></tr>'; }

@@ -65,16 +65,18 @@ export async function onRequest(context) {
       return Response.json(rows.results, { headers: cors });
     }
 
-    // DELETE
+    // DELETE — cannot delete linked certs
     if (request.method === 'DELETE') {
       const id = url.searchParams.get('id');
       if (!id) return Response.json({ error: 'id required' }, { status: 400, headers: cors });
 
       const row = await env.DB.prepare('SELECT * FROM whatsapp_cert WHERE id=?').bind(id).first();
-      if (row) {
-        await env.R2.delete(row.r2_key);
-        await env.DB.prepare('DELETE FROM whatsapp_cert WHERE id=?').bind(id).run();
+      if (!row) return Response.json({ ok: true }, { headers: cors });
+      if (row.person_type && row.person_id) {
+        return Response.json({ error: '已關聯憑證無法刪除，請先取消關聯' }, { status: 409, headers: cors });
       }
+      await env.R2.delete(row.r2_key);
+      await env.DB.prepare('DELETE FROM whatsapp_cert WHERE id=?').bind(id).run();
       return Response.json({ ok: true }, { headers: cors });
     }
 
