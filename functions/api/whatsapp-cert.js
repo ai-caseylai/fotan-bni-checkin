@@ -35,8 +35,11 @@ export async function onRequest(context) {
           'SELECT a.person_type, a.person_id, a.payment FROM attendance a WHERE a.meeting_id=?'
         ).bind(lastMeeting.id).all();
 
-        const certs = await env.DB.prepare('SELECT from_number FROM whatsapp_cert').all();
-        const certPhones = new Set(certs.results.map(r => r.from_number.replace(/[^0-9]/g, '').slice(-8)));
+        // All people already linked to a cert
+        const linked = await env.DB.prepare(
+          "SELECT person_type, person_id FROM whatsapp_cert WHERE person_type != '' AND person_id != 0"
+        ).all();
+        const linkedSet = new Set(linked.results.map(r => `${r.person_type}:${r.person_id}`));
 
         // Get all members and guests
         const members = await env.DB.prepare('SELECT id, name, tel FROM members WHERE active=1').all();
@@ -51,8 +54,7 @@ export async function onRequest(context) {
           const key = `${a.person_type}:${a.person_id}`;
           const p = personMap[key];
           if (!p) continue;
-          const phone8 = (p.tel || '').replace(/[^0-9]/g, '').slice(-8);
-          if (!phone8 || certPhones.has(phone8)) continue;
+          if (linkedSet.has(key)) continue;
           missing.push({ person_type: a.person_type, person_id: a.person_id, name: p.name, tel: p.tel, payment: a.payment });
         }
 
