@@ -2745,7 +2745,7 @@ async function loadWaCerts() {
       <td>${r.r2_key ? `<a href="/api/image?name=${esc(r.r2_key)}" target="_blank"><img src="/api/image?name=${esc(r.r2_key)}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border)"></a>` : '—'}</td>
       <td style="font-size:12px">${esc(r.from_number||'—')}</td>
       <td style="font-weight:${r.person_name?'600':'400'};color:${r.person_name?'var(--text)':'var(--text3)'}">${esc(r.person_name||'未關聯')}</td>
-      <td style="max-width:160px;white-space:pre-wrap;word-break:break-word">${esc(r.comment||'—')}</td>
+      <td style="max-width:160px;white-space:pre-wrap;word-break:break-word;cursor:pointer" onclick="editCertComment(${r.id},'${esc(r.comment||'')}')" title="點擊修改備註">${esc(r.comment||'—')}</td>
       <td style="font-size:11px">${esc((r.created_at||'').substring(0,16))}</td>
       <td>
         ${r.person_name
@@ -2772,6 +2772,19 @@ function unlinkWaCert(id) {
     body: JSON.stringify({ id, person_type: '', person_id: 0, person_name: '' })
   }).then(r => r.json()).then(d => {
     if (d.ok) { toast('已取消關聯'); loadWaCerts(); }
+    else { toast('失敗: ' + (d.error||'')); }
+  });
+}
+
+function editCertComment(id, currentComment) {
+  const newComment = prompt('修改相片備註：', currentComment);
+  if (newComment === null) return;
+  fetch('/api/whatsapp-cert', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, comment: newComment })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { toast('已更新'); loadWaCerts(); }
     else { toast('失敗: ' + (d.error||'')); }
   });
 }

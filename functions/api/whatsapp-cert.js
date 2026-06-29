@@ -80,15 +80,24 @@ export async function onRequest(context) {
       return Response.json({ ok: true }, { headers: cors });
     }
 
-    // PUT — link / unlink cert to person
+    // PUT — link / unlink / update comment
     if (request.method === 'PUT') {
       const body = await request.json();
-      const { id, person_type, person_id, person_name } = body;
+      const { id, person_type, person_id, person_name, comment, note } = body;
       if (!id) return Response.json({ error: 'id required' }, { status: 400, headers: cors });
 
-      await env.DB.prepare(
-        'UPDATE whatsapp_cert SET person_type=?, person_id=?, person_name=? WHERE id=?'
-      ).bind(person_type || '', person_id || 0, person_name || '', id).run();
+      const sets = [];
+      const vals = [];
+      if (person_type !== undefined) { sets.push('person_type=?'); vals.push(person_type || ''); }
+      if (person_id !== undefined) { sets.push('person_id=?'); vals.push(person_id || 0); }
+      if (person_name !== undefined) { sets.push('person_name=?'); vals.push(person_name || ''); }
+      if (comment !== undefined) { sets.push('comment=?'); vals.push(comment); }
+      if (note !== undefined) { sets.push('note=?'); vals.push(note); }
+
+      if (sets.length) {
+        vals.push(id);
+        await env.DB.prepare(`UPDATE whatsapp_cert SET ${sets.join(',')} WHERE id=?`).bind(...vals).run();
+      }
 
       return Response.json({ ok: true }, { headers: cors });
     }
