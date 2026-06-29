@@ -26,6 +26,39 @@ export async function onRequest(context) {
         if (!row) return Response.json({ error: 'not found' }, { status: 404, headers: cors });
         return Response.json(row, { headers: cors });
       }
+      // ?missing=1 — list people from last meeting without certs
+      if (url.searchParams.get('missing') === '1') {
+        const lastMeeting = await env.DB.prepare('SELECT * FROM meetings ORDER BY date DESC LIMIT 1').first();
+        if (!lastMeeting) return Response.json({ meeting: null, people: [] }, { headers: cors });
+
+        const att = await env.DB.prepare(
+          'SELECT a.person_type, a.person_id, a.payment FROM attendance a WHERE a.meeting_id=?'
+        ).bind(lastMeeting.id).all();
+
+        const certs = await env.DB.prepare('SELECT from_number FROM whatsapp_cert').all();
+        const certPhones = new Set(certs.results.map(r => r.from_number.replace(/[^0-9]/g, '').slice(-8)));
+
+        // Get all members and guests
+        const members = await env.DB.prepare('SELECT id, name, tel FROM members WHERE active=1').all();
+        const guests = await env.DB.prepare('SELECT id, name, tel FROM guests WHERE active=1').all();
+
+        const personMap = {};
+        for (const m of members.results) personMap[`member:${m.id}`] = m;
+        for (const g of guests.results) personMap[`guest:${g.id}`] = g;
+
+        const missing = [];
+        for (const a of att.results) {
+          const key = `${a.person_type}:${a.person_id}`;
+          const p = personMap[key];
+          if (!p) continue;
+          const phone8 = (p.tel || '').replace(/[^0-9]/g, '').slice(-8);
+          if (!phone8 || certPhones.has(phone8)) continue;
+          missing.push({ person_type: a.person_type, person_id: a.person_id, name: p.name, tel: p.tel, payment: a.payment });
+        }
+
+        return Response.json({ meeting: lastMeeting, people: missing }, { headers: cors });
+      }
+
       const rows = await env.DB.prepare('SELECT * FROM whatsapp_cert ORDER BY created_at DESC').all();
       return Response.json(rows.results, { headers: cors });
     }
