@@ -2796,7 +2796,7 @@ async function showLinkCertModal(certId) {
   modal.innerHTML = `<div class="modal-dialog" style="max-width:480px">
     <h3>🔗 關聯憑證到來賓</h3>
     <input type="text" id="link-cert-search" placeholder="搜尋姓名或電話..." style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:12px;outline:none"
-           oninput="filterLinkCertList()">
+           oninput="filterLinkCertList()" onkeyup="filterLinkCertList()">
     <div id="link-cert-list" style="max-height:340px;overflow-y:auto">
       <div style="text-align:center;color:var(--text2);padding:20px">載入中...</div>
     </div>
@@ -2822,9 +2822,11 @@ async function showLinkCertModal(certId) {
 function filterLinkCertList() {
   const q = (document.getElementById('link-cert-search')?.value || '').toLowerCase();
   const raw = q.replace(/[^0-9]/g, '');
-  const filtered = (window._linkCertPeople || []).filter(p =>
-    (p.name || '').toLowerCase().includes(q) || (p.tel || '').replace(/[^0-9]/g, '').includes(raw)
-  );
+  const filtered = (window._linkCertPeople || []).filter(p => {
+    const nameMatch = (p.name || '').toLowerCase().includes(q);
+    const telMatch = raw && (p.tel || '').replace(/[^0-9]/g, '').includes(raw);
+    return nameMatch || telMatch;
+  });
   renderLinkCertList(filtered);
 }
 
