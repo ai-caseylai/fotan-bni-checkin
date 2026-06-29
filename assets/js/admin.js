@@ -2858,7 +2858,6 @@ async function linkCertToPerson(certId, personType, personId, personName) {
       toast('✅ 已關聯到 ' + personName);
       document.querySelectorAll('[style*="position:fixed"][style*="z-index:200"]').forEach(m => m.remove());
       loadWaCerts();
-      loadWaCertMissing();
     } else {
       toast('❌ 關聯失敗: ' + (resp.error||''));
     }
