@@ -2732,8 +2732,8 @@ async function renderWaCertPage(pc) {
       <div class="panel-header"><h2>📋 已上傳憑證</h2></div>
       <div class="panel-body" style="padding:0">
         <table class="data-table">
-          <thead><tr><th>縮圖</th><th>來自誰人</th><th>相片備註</th><th>日期</th><th></th></tr></thead>
-          <tbody id="wacert-list"><tr><td colspan="5">載入中...</td></tr></tbody>
+          <thead><tr><th>縮圖</th><th>來自那個WhatsApp</th><th>關聯的嘉賓</th><th>相片備註</th><th>日期</th><th></th></tr></thead>
+          <tbody id="wacert-list"><tr><td colspan="6">載入中...</td></tr></tbody>
         </table>
       </div>
     </div>`;
@@ -2793,18 +2793,19 @@ async function loadWaCerts() {
   try {
     const rows = await fetch('/api/whatsapp-cert').then(r => r.json());
     const el = document.getElementById('wacert-list');
-    if (!rows.length) { el.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2)">暫無憑證</td></tr>'; return; }
+    if (!rows.length) { el.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2)">暫無憑證</td></tr>'; return; }
     el.innerHTML = rows.map(r => `<tr>
       <td>${r.r2_key ? `<a href="/api/image?name=${esc(r.r2_key)}" target="_blank"><img src="/api/image?name=${esc(r.r2_key)}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border)"></a>` : '—'}</td>
-      <td>${esc(r.person_name||r.from_number||'—')}</td>
-      <td style="max-width:200px;white-space:pre-wrap;word-break:break-word">${esc(r.comment||'—')}</td>
+      <td style="font-size:12px">${esc(r.from_number||'—')}</td>
+      <td style="font-weight:${r.person_name?'600':'400'};color:${r.person_name?'var(--text)':'var(--text3)'}">${esc(r.person_name||'未關聯')}</td>
+      <td style="max-width:160px;white-space:pre-wrap;word-break:break-word">${esc(r.comment||'—')}</td>
       <td style="font-size:11px">${esc((r.created_at||'').substring(0,16))}</td>
       <td>
         <button class="btn btn-sm" style="background:#3b82f6;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="showLinkCertModal(${r.id})">關聯來賓</button>
         <button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button>
       </td>
     </tr>`).join('');
-  } catch(e) { document.getElementById('wacert-list').innerHTML = '<tr><td colspan="5">載入失敗</td></tr>'; }
+  } catch(e) { document.getElementById('wacert-list').innerHTML = '<tr><td colspan="6">載入失敗</td></tr>'; }
 }
 
 function deleteWaCert(id) {
@@ -2816,15 +2817,15 @@ function deleteWaCert(id) {
 
 async function showLinkCertModal(certId) {
   const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.85);display:flex;align-items:center;justify-content:center;z-index:200';
   modal.onclick = e => { if (e.target === modal) modal.remove(); };
-  modal.innerHTML = `<div class="modal-box" style="max-width:480px">
-    <div class="modal-header">🔗 關聯憑證到來賓</div>
-    <div class="modal-body" id="link-cert-list" style="max-height:400px;overflow-y:auto">
+  modal.innerHTML = `<div class="modal-dialog" style="max-width:480px">
+    <h3>🔗 關聯憑證到來賓</h3>
+    <div id="link-cert-list" style="max-height:400px;overflow-y:auto">
       <div style="text-align:center;color:var(--text2);padding:20px">載入中...</div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">取消</button>
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn btn-outline" onclick="this.closest('[style*=\'position:fixed\']').remove()">取消</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -2859,7 +2860,7 @@ async function linkCertToPerson(certId, personType, personId, personName) {
     }).then(r => r.json());
     if (resp.ok) {
       toast('✅ 已關聯到 ' + personName);
-      document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
+      document.querySelectorAll('[style*="position:fixed"][style*="z-index:200"]').forEach(m => m.remove());
       loadWaCerts();
       loadWaCertMissing();
     } else {
