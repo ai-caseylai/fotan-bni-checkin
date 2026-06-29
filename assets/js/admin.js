@@ -2821,8 +2821,9 @@ async function showLinkCertModal(certId) {
 
 function filterLinkCertList() {
   const q = (document.getElementById('link-cert-search')?.value || '').toLowerCase();
+  const raw = q.replace(/[^0-9]/g, '');
   const filtered = (window._linkCertPeople || []).filter(p =>
-    p.name.toLowerCase().includes(q) || (p.tel || '').replace(/[^0-9]/g, '').includes(q.replace(/[^0-9]/g, ''))
+    (p.name || '').toLowerCase().includes(q) || (p.tel || '').replace(/[^0-9]/g, '').includes(raw)
   );
   renderLinkCertList(filtered);
 }
