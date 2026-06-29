@@ -2724,10 +2724,6 @@ function formatFileSize(bytes) {
 // ── 入錢憑證 Page ─────────────────────────────
 async function renderWaCertPage(pc) {
   pc.innerHTML = `<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">💰 入錢憑證</h2>
-    <div class="panel" style="margin-bottom:16px">
-      <div class="panel-header"><h2>📋 上傳憑證</h2></div>
-      <div class="panel-body" id="wacert-upload-area"><span style="color:var(--text2)">載入中...</span></div>
-    </div>
     <div class="panel">
       <div class="panel-header"><h2>📋 已上傳憑證</h2></div>
       <div class="panel-body" style="padding:0">
@@ -2737,56 +2733,7 @@ async function renderWaCertPage(pc) {
         </table>
       </div>
     </div>`;
-  loadWaCertMissing();
   loadWaCerts();
-}
-
-async function loadWaCertMissing() {
-  try {
-    const data = await fetch('/api/whatsapp-cert?missing=1').then(r => r.json());
-    const el = document.getElementById('wacert-upload-area');
-    if (!data.meeting) { el.innerHTML = '<span style="color:var(--text2)">未有會議記錄</span>'; return; }
-    if (!data.people.length) { el.innerHTML = '<span style="color:#10b981">✅ 所有出席者已有憑證 — ' + esc(data.meeting.date) + '</span>'; return; }
-    el.innerHTML = `<div style="margin-bottom:8px;font-size:13px;color:var(--text2)">📅 ${esc(data.meeting.date)} — ${data.people.length} 人未有憑證</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">${data.people.map(p => `
-        <div style="border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;background:#fff;min-width:180px">
-          <div style="flex:1">
-            <div style="font-weight:600;font-size:13px">${esc(p.name)}</div>
-            <div style="font-size:11px;color:var(--text2)">${esc(p.tel||'無電話')}</div>
-            <div style="font-size:10px;color:${p.payment==='paid'?'#10b981':'#ef4444'}">${p.payment==='paid'?'已付款':'未付款'}</div>
-          </div>
-          <button class="btn btn-sm" style="background:#10b981;color:#fff;font-size:11px;padding:4px 10px;white-space:nowrap" onclick="uploadCertForPerson('${p.person_type}',${p.person_id},'${esc(p.name)}')">上傳</button>
-        </div>`).join('')}</div>`;
-  } catch(e) { document.getElementById('wacert-upload-area').innerHTML = '<span style="color:#ef4444">載入失敗</span>'; }
-}
-
-function uploadCertForPerson(personType, personId, name) {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*';
-  input.onchange = async () => {
-    const file = input.files[0];
-    if (!file) return;
-    toast('上傳中...');
-    const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(file); });
-    const base64 = b64.split('base64,')[1] || b64;
-    try {
-      const resp = await fetch('/api/whatsapp-cert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: 'lob_nt8r6aekwv1z8xcpvbnw5uag',
-          from_number: '85297188675',
-          data: base64,
-            person_type: personType,
-          person_id: personId,
-          person_name: name
-        })
-      }).then(r => r.json());
-      if (resp.ok) { toast('✅ 已上傳'); loadWaCertMissing(); loadWaCerts(); }
-      else { toast('❌ 上傳失敗: ' + (resp.error||'')); }
-    } catch(e) { toast('❌ ' + e.message); }
-  };
-  input.click();
 }
 
 async function loadWaCerts() {
@@ -2811,7 +2758,7 @@ async function loadWaCerts() {
 function deleteWaCert(id) {
   if (!confirm('確定刪除此憑證？')) return;
   fetch('/api/whatsapp-cert?id='+id, { method: 'DELETE' }).then(r => r.json()).then(d => {
-    if (d.ok) { toast('已刪除'); loadWaCerts(); loadWaCertMissing(); }
+    if (d.ok) { toast('已刪除'); loadWaCerts(); }
   });
 }
 
