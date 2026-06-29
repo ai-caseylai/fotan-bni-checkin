@@ -2,7 +2,7 @@ export async function onRequest(context) {
   const { request, env } = context;
   const cors = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type'
   };
   if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
@@ -73,6 +73,20 @@ export async function onRequest(context) {
         await env.R2.delete(row.r2_key);
         await env.DB.prepare('DELETE FROM whatsapp_cert WHERE id=?').bind(id).run();
       }
+      return Response.json({ ok: true }, { headers: cors });
+    }
+
+    // PUT — link cert to person
+    if (request.method === 'PUT') {
+      const body = await request.json();
+      const { id, person_type, person_id, person_name } = body;
+      if (!id) return Response.json({ error: 'id required' }, { status: 400, headers: cors });
+      if (!person_type || !person_id) return Response.json({ error: 'person_type and person_id required' }, { status: 400, headers: cors });
+
+      await env.DB.prepare(
+        'UPDATE whatsapp_cert SET person_type=?, person_id=?, person_name=? WHERE id=?'
+      ).bind(person_type, person_id, person_name || '', id).run();
+
       return Response.json({ ok: true }, { headers: cors });
     }
 

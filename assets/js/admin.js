@@ -2799,7 +2799,10 @@ async function loadWaCerts() {
       <td>${esc(r.person_name||r.from_number||'—')}</td>
       <td style="max-width:200px;white-space:pre-wrap;word-break:break-word">${esc(r.comment||'—')}</td>
       <td style="font-size:11px">${esc((r.created_at||'').substring(0,16))}</td>
-      <td><button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button></td>
+      <td>
+        <button class="btn btn-sm" style="background:#3b82f6;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="showLinkCertModal(${r.id})">關聯來賓</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button>
+      </td>
     </tr>`).join('');
   } catch(e) { document.getElementById('wacert-list').innerHTML = '<tr><td colspan="5">載入失敗</td></tr>'; }
 }
@@ -2809,6 +2812,60 @@ function deleteWaCert(id) {
   fetch('/api/whatsapp-cert?id='+id, { method: 'DELETE' }).then(r => r.json()).then(d => {
     if (d.ok) { toast('已刪除'); loadWaCerts(); loadWaCertMissing(); }
   });
+}
+
+async function showLinkCertModal(certId) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `<div class="modal-box" style="max-width:480px">
+    <div class="modal-header">🔗 關聯憑證到來賓</div>
+    <div class="modal-body" id="link-cert-list" style="max-height:400px;overflow-y:auto">
+      <div style="text-align:center;color:var(--text2);padding:20px">載入中...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">取消</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  try {
+    const data = await fetch('/api/whatsapp-cert?missing=1').then(r => r.json());
+    const el = document.getElementById('link-cert-list');
+    if (!data.people || !data.people.length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px">暫無未關聯來賓</div>';
+      return;
+    }
+    el.innerHTML = data.people.map(p => `
+      <div style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-radius:6px;margin:2px 0"
+           onclick="linkCertToPerson(${certId},'${p.person_type}',${p.person_id},'${esc(p.name)}')"
+           onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
+        <div>
+          <div style="font-weight:600;font-size:13px">${esc(p.name)}</div>
+          <div style="font-size:11px;color:var(--text2)">${esc(p.tel||'無電話')} · ${p.payment==='paid'?'已付款':'未付款'}</div>
+        </div>
+        <span style="color:var(--text3);font-size:18px">›</span>
+      </div>
+    `).join('');
+  } catch(e) { document.getElementById('link-cert-list').innerHTML = '<div style="text-align:center;color:#ef4444;padding:20px">載入失敗</div>'; }
+}
+
+async function linkCertToPerson(certId, personType, personId, personName) {
+  try {
+    const resp = await fetch('/api/whatsapp-cert', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: certId, person_type: personType, person_id: personId, person_name: personName })
+    }).then(r => r.json());
+    if (resp.ok) {
+      toast('✅ 已關聯到 ' + personName);
+      document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
+      loadWaCerts();
+      loadWaCertMissing();
+    } else {
+      toast('❌ 關聯失敗: ' + (resp.error||''));
+    }
+  } catch(e) { toast('❌ ' + e.message); }
 }
 
 // ── Docs Page ────────────────────────────────────
