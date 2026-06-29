@@ -98,22 +98,29 @@ export async function onRequest(context) {
       const tok = await verifyToken(token);
       if (!tok) return Response.json({ error: 'invalid or expired token' }, { status: 401, headers: cors });
       if (!from_number) return Response.json({ error: 'from_number required' }, { status: 400, headers: cors });
-      if (!data) return Response.json({ error: 'data (base64 photo) required' }, { status: 400, headers: cors });
 
-      const base64 = data.replace(/^data:image\/\w+;base64,/, '');
-      const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
       const ts = Date.now();
-      const r2Key = `whatsapp-cert-${ts}-${from_number.replace(/[^0-9]/g,'')}.jpg`;
+      let r2Key = '';
+      let filename = '';
+      let fileSize = 0;
 
-      await env.R2.put(r2Key, bytes, {
-        httpMetadata: { contentType: 'image/jpeg', cacheControl: 'public, max-age=86400' }
-      });
+      if (data) {
+        const base64 = data.replace(/^data:image\/\w+;base64,/, '');
+        const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+        r2Key = `whatsapp-cert-${ts}-${from_number.replace(/[^0-9]/g,'')}.jpg`;
+        fileSize = bytes.length;
+
+        await env.R2.put(r2Key, bytes, {
+          httpMetadata: { contentType: 'image/jpeg', cacheControl: 'public, max-age=86400' }
+        });
+        filename = `${ts}.jpg`;
+      }
 
       await env.DB.prepare(
         'INSERT INTO whatsapp_cert (from_number, filename, r2_key, comment, note, content_type, file_size, person_type, person_id, person_name) VALUES (?,?,?,?,?,?,?,?,?,?)'
-      ).bind(from_number, `${ts}.jpg`, r2Key, comment || '', note || '', 'image/jpeg', bytes.length, person_type || '', person_id || 0, person_name || '').run();
+      ).bind(from_number, filename, r2Key, comment || '', note || '', data ? 'image/jpeg' : '', fileSize, person_type || '', person_id || 0, person_name || '').run();
 
-      return Response.json({ ok: true, r2_key: r2Key, url: `/api/image?name=${r2Key}` }, { headers: cors });
+      return Response.json({ ok: true, r2_key: r2Key }, { headers: cors });
     }
 
   } catch (e) {
