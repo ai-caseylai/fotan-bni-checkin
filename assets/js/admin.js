@@ -2953,7 +2953,35 @@ async function deleteSkillToken(id) {
 }
 
 function downloadSkill() {
-  var content = '---\nname: fotan-skill\ndescription: 火炭會聚會簽到系統完整 Skill — 查詢、匯入、付款、會議、統計、枱號\n---\n\n# 火炭會 Skill\n\n## Token 驗證\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n所有請求格式：`POST https://fotan.techforliving.net/api/skill` + JSON body，必須帶 `token` 同 `action`。\n\n---\n\n## 🌟 嘉賓名單匯入\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{\n    "token": "YOUR_TOKEN",\n    "action": "import_guests",\n    "guests": [\n      {"name": "陳大文", "professional": "律師", "payment": "paid"},\n      {"name": "李小華", "professional": "會計師", "payment": "unpaid"},\n      {"name": "張三", "professional": "工程師", "payment": "free"}\n    ]\n  }\'\n```\n\n| 欄位 | 說明 |\n|------|------|\n| `name` | 姓名（必填） |\n| `professional` | 專業（可選） |\n| `payment` | `paid` / `unpaid` / `free` |\n| `tel` | 電話（可選） |\n| `invited_by` | 邀請人（可選） |\n\n**規則：** 自動用最新會議、跳過會員/來賓重複、如係會員會更新其 attendance 付款狀態。\n\n---\n\n## 💰 更新付款狀態\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_payment", "attendance_id": 123, "payment": "paid"}\'\n```\n\n`payment` 值：`paid` / `free` / `unpaid`\n\n---\n\n## 🍽️ 更新枱號\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_table", "meeting_id": 10, "person_type": "member", "person_id": 26, "table_number": "5"}\'\n```\n\n---\n\n## ✅ 標記出席\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "mark_arrival", "attendance_id": 123, "arrival_time": "12:30"}\'\n```\n\n`arrival_time` 值：`HH:MM` 或 `absent`（缺席）\n\n---\n\n## 🔍 搜尋\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "search", "q": "陳"}\'\n```\n\n---\n\n## 📊 會議統計\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "meeting_stats"}\'\n```\n\n---\n\n## 💳 付款摘要\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "payment_summary"}\'\n```\n\n---\n\n## 📋 會議列表\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n---\n\n## 👥 出席名單\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_attendance"}\'\n```\n\n---\n\n## 🛠️ 手動 SQL（需要 Wrangler + Node.js）\n\n資料庫：D1 `fotan-db`\n```bash\nnpx wrangler d1 execute fotan-db --remote --command "<SQL>"\n```\n';
+  var content = '---\nname: fotan-skill\ndescription: 火炭會聚會簽到系統完整 Skill — 查詢、匯入、付款、會議、統計、枱號\n---\n\n# 火炭會 Skill\n\n## Token 驗證\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n所有請求格式：`POST https://fotan.techforliving.net/api/skill` + JSON body，必須帶 `token` 同 `action`。\n\n---\n\n## 🌟 嘉賓名單匯入\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{\n    "token": "YOUR_TOKEN",\n    "action": "import_guests",\n    "guests": [\n      {"name": "陳大文", "professional": "律師", "payment": "paid"},\n      {"name": "李小華", "professional": "會計師", "payment": "unpaid"},\n      {"name": "張三", "professional": "工程師", "payment": "free"}\n    ]\n  }\'\n```\n\n| 欄位 | 說明 |\n|------|------|\n| `name` | 姓名（必填） |\n| `professional` | 專業（可選） |\n| `payment` | `paid` / `unpaid` / `free` |\n| `tel` | 電話（可選） |\n| `invited_by` | 邀請人（可選） |\n\n**規則：** 自動用最新會議、跳過會員/來賓重複、如係會員會更新其 attendance 付款狀態。\n\n---\n\n## 💰 更新付款狀態\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_payment", "attendance_id": 123, "payment": "paid"}\'\n```\n\n`payment` 值：`paid` / `free` / `unpaid`\n\n---\n\n## 🍽️ 更新枱號\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_table", "meeting_id": 10, "person_type": "member", "person_id": 26, "table_number": "5"}\'\n```\n\n---\n\n## ✅ 標記出席\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "mark_arrival", "attendance_id": 123, "arrival_time": "12:30"}\'\n```\n\n`arrival_time` 值：`HH:MM` 或 `absent`（缺席）\n\n---\n\n## 🔍 搜尋\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "search", "q": "陳"}\'\n```\n\n---\n\n## 📊 會議統計\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "meeting_stats"}\'\n```\n\n---\n\n## 💳 付款摘要\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "payment_summary"}\'\n```\n\n---\n\n## 📋 會議列表\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n---\n\n## 👥 出席名單\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_attendance"}\'\n```\n\n---\n\n## 💬 WhatsApp 入錢憑證
+
+```bash
+# 上傳純文字
+curl -s -X POST "https://fotan.techforliving.net/api/whatsapp-cert" \\
+  -H "Content-Type: application/json" \\
+  -d '{"token": "YOUR_TOKEN", "from_number": "85297188675", "comment": "已過數 $200"}'
+
+# 上傳相片 + 備註 + 關聯來賓
+curl -s -X POST "https://fotan.techforliving.net/api/whatsapp-cert" \\
+  -H "Content-Type: application/json" \\
+  -d '{"token": "YOUR_TOKEN", "from_number": "85297188675", "data": "base64...", "comment": "收據", "note": "已確認", "person_type": "guest", "person_id": 5, "person_name": "陳大文"}'
+
+# 查詢未關聯來賓
+curl -s "https://fotan.techforliving.net/api/whatsapp-cert?missing=1"
+```
+
+| 欄位 | 說明 |
+|------|------|
+| `token` | 技能 Token（必填） |
+| `from_number` | WhatsApp 號碼（必填） |
+| `data` | Base64 相片（可選，純文字可省略） |
+| `comment` | 相片 caption 備註（可選） |
+| `note` | 額外文字備註（可選） |
+| `person_type` | `member` / `guest`（可選，上傳時可指定） |
+| `person_id` | 人員 ID（可選） |
+| `person_name` | 人員姓名（可選） |
+
+---\n\n## 🛠️ 手動 SQL（需要 Wrangler + Node.js）\n\n資料庫：D1 `fotan-db`\n```bash\nnpx wrangler d1 execute fotan-db --remote --command "<SQL>"\n```\n';
   var blob = new Blob([content], { type: 'text/markdown' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2982,7 +3010,7 @@ function downloadAPIManual() {
     '| get_settings | — | 系統設定 |\n'+
     '| export_stats | — | 綜合統計 |\n\n'+
     '## 後台 API（Cookie 驗證）\n\n'+
-    '全部在 /api/ 路徑：members, guests, meetings, attendance, auth, chat, telegram, skill-tokens, skill, settings, stats, receipts, checkin-upload, backup, image\n\n'+
+    '全部在 /api/ 路徑：members, guests, meetings, attendance, auth, chat, telegram, skill-tokens, skill, settings, stats, receipts, checkin-upload, backup, image, whatsapp-cert\n\n'+
     '## Chatbot Tools（19 個）\n'+
     'get_meetings, get_attendance, get_member_stats, search_people, get_member_detail, get_guest_list, get_payment_summary, get_industry_list, add_guest, bulk_add_guests, add_meeting, update_payment, update_table, mark_arrival, get_settings, delete_attendance, get_receipts, create_member, update_member\n';
   var blob = new Blob([content], { type: 'text/markdown' });
