@@ -79,7 +79,7 @@ export async function onRequest(context) {
     // POST — create (base64 photo) — requires valid token
     if (request.method === 'POST') {
       const body = await request.json();
-      const { token, from_number, data, comment, note } = body;
+      const { token, from_number, data, comment, note, person_type, person_id, person_name } = body;
       if (!token) return Response.json({ error: 'token required' }, { status: 401, headers: cors });
       const tok = await verifyToken(token);
       if (!tok) return Response.json({ error: 'invalid or expired token' }, { status: 401, headers: cors });
@@ -96,8 +96,8 @@ export async function onRequest(context) {
       });
 
       await env.DB.prepare(
-        'INSERT INTO whatsapp_cert (from_number, filename, r2_key, comment, note, content_type, file_size) VALUES (?,?,?,?,?,?,?)'
-      ).bind(from_number, `${ts}.jpg`, r2Key, comment || '', note || '', 'image/jpeg', bytes.length).run();
+        'INSERT INTO whatsapp_cert (from_number, filename, r2_key, comment, note, content_type, file_size, person_type, person_id, person_name) VALUES (?,?,?,?,?,?,?,?,?,?)'
+      ).bind(from_number, `${ts}.jpg`, r2Key, comment || '', note || '', 'image/jpeg', bytes.length, person_type || '', person_id || 0, person_name || '').run();
 
       return Response.json({ ok: true, r2_key: r2Key, url: `/api/image?name=${r2Key}` }, { headers: cors });
     }

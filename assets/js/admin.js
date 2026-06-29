@@ -2732,7 +2732,7 @@ async function renderWaCertPage(pc) {
       <div class="panel-header"><h2>📋 已上傳憑證</h2></div>
       <div class="panel-body" style="padding:0">
         <table class="data-table">
-          <thead><tr><th>縮圖</th><th>發送號碼</th><th>相片備註</th><th>日期</th><th></th></tr></thead>
+          <thead><tr><th>縮圖</th><th>來自誰人</th><th>相片備註</th><th>日期</th><th></th></tr></thead>
           <tbody id="wacert-list"><tr><td colspan="5">載入中...</td></tr></tbody>
         </table>
       </div>
@@ -2777,7 +2777,9 @@ function uploadCertForPerson(personType, personId, name) {
           token: 'lob_nt8r6aekwv1z8xcpvbnw5uag',
           from_number: '85297188675',
           data: base64,
-          comment: `${name} (${personType}:${personId})`
+            person_type: personType,
+          person_id: personId,
+          person_name: name
         })
       }).then(r => r.json());
       if (resp.ok) { toast('✅ 已上傳'); loadWaCertMissing(); loadWaCerts(); }
@@ -2794,7 +2796,7 @@ async function loadWaCerts() {
     if (!rows.length) { el.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2)">暫無憑證</td></tr>'; return; }
     el.innerHTML = rows.map(r => `<tr>
       <td>${r.r2_key ? `<a href="/api/image?name=${esc(r.r2_key)}" target="_blank"><img src="/api/image?name=${esc(r.r2_key)}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border)"></a>` : '—'}</td>
-      <td>${esc(r.from_number||'—')}</td>
+      <td>${esc(r.person_name||r.from_number||'—')}</td>
       <td style="max-width:200px;white-space:pre-wrap;word-break:break-word">${esc(r.comment||'—')}</td>
       <td style="font-size:11px">${esc((r.created_at||'').substring(0,16))}</td>
       <td><button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button></td>
