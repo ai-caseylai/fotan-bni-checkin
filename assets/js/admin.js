@@ -2817,7 +2817,7 @@ function deleteWaCert(id) {
 
 async function showLinkCertModal(certId) {
   const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.85);display:flex;align-items:center;justify-content:center;z-index:200';
+  modal.style.cssText = 'position:fixed;inset:0;background:#0f1729;display:flex;align-items:center;justify-content:center;z-index:200';
   modal.onclick = e => { if (e.target === modal) modal.remove(); };
   modal.innerHTML = `<div class="modal-dialog" style="max-width:480px">
     <h3>🔗 關聯憑證到來賓</h3>
