@@ -1,6 +1,6 @@
 ---
 name: fotan-skill
-description: 火炭會聚會簽到系統 v3.14 — 31 Skill Actions · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
+description: 火炭會聚會簽到系統 v3.14 — 32 Skill Actions · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
 ---
 
 # 火炭會 Skill v3.14
@@ -265,6 +265,19 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -d '{"token":"TOKEN","action":"move_table","from_table":"3","to_table":"5","force":true}'
 ```
 自動檢查目標枱容量。不加 force 時，超出上限保留原枱。加 force 時，超額自動分到 to_table+1, to_table+2... 後續枱號。
+
+---
+
+## 📊 payment_audit — 付款審計（對數用）
+
+查詢會議所有 attendance，連同每個人的收據圖片連結。用於對數核實。
+
+```bash
+curl -s -X POST "https://fotan.techforliving.net/api/skill" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"TOKEN","action":"payment_audit"}'
+```
+可指定 `meeting_id`。回傳：meeting 資訊、stats（total/paid/free/unpaid/with_receipt/without_receipt）、records（每人 payment + arrival_time + receipts[] 含 image_url）。
 
 ---
 

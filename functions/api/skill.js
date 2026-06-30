@@ -480,6 +480,100 @@ export async function onRequest(context) {
     // ═══════════════════════════════════════════════════
 
     // ── list_tables ──────────────────────────────────
+    // ── payment_audit ──────────────────────────────────
+    if (action === 'payment_audit') {
+      let mid = body.meeting_id;
+      if (!mid) {
+        const latest = await env.DB.prepare('SELECT id, date FROM meetings ORDER BY date DESC LIMIT 1').first();
+        if (!latest) return Response.json({ ok: false, error: 'no meeting found' }, { headers: cors });
+        mid = latest.id;
+      }
+      const meeting = await env.DB.prepare('SELECT * FROM meetings WHERE id=?').bind(mid).first();
+      if (!meeting) return Response.json({ ok: false, error: 'meeting not found' }, { headers: cors });
+
+      const att = await env.DB.prepare(
+        'SELECT a.* FROM attendance a WHERE a.meeting_id=? ORDER BY a.person_type, a.person_id'
+      ).bind(mid).all();
+
+      // Get all linked receipt images
+      const wcerts = await env.DB.prepare(
+        "SELECT id, from_number, filename, r2_key, comment, note, person_type, person_id, person_name FROM whatsapp_cert WHERE person_type != '' AND person_id != 0"
+      ).all();
+      const mreceipts = await env.DB.prepare('SELECT * FROM member_receipts').all();
+      const docs = await env.DB.prepare(
+        "SELECT * FROM documents WHERE person_type IN ('member','guest')"
+      ).all();
+
+      // Build person name lookup
+      const members = await env.DB.prepare('SELECT id, name, tel FROM members').all();
+      const guests = await env.DB.prepare('SELECT id, name, tel, invited_by FROM guests').all();
+      const pMap = {};
+      for (const m of members.results) pMap['member:'+m.id] = m;
+      for (const g of guests.results) pMap['guest:'+g.id] = g;
+
+      // Build receipt maps
+      const wcertByPerson = {};
+      for (const w of wcerts.results) {
+        const k = w.person_type+':'+w.person_id;
+        if (!wcertByPerson[k]) wcertByPerson[k] = [];
+        wcertByPerson[k].push({ type: 'whatsapp', id: w.id, from_number: w.from_number, r2_key: w.r2_key, image_url: '/api/image?name='+w.r2_key, comment: w.comment, note: w.note });
+      }
+      const receiptByMember = {};
+      for (const r of mreceipts.results) {
+        if (!receiptByMember[r.member_id]) receiptByMember[r.member_id] = [];
+        receiptByMember[r.member_id].push({ type: 'member_receipt', id: r.id, filename: r.filename, image_url: '/api/image?name='+r.filename });
+      }
+      const docByPerson = {};
+      for (const d of docs.results) {
+        const k = d.person_type+':'+d.person_id;
+        if (!docByPerson[k]) docByPerson[k] = [];
+        docByPerson[k].push({ type: 'document', id: d.id, filename: d.filename, r2_key: d.r2_key, image_url: '/api/image?name='+d.r2_key });
+      }
+
+      const records = [];
+      for (const a of att.results) {
+        const pk = a.person_type+':'+a.person_id;
+        const p = pMap[pk] || {};
+        const receipts = [
+          ...(wcertByPerson[pk] || []),
+          ...(a.person_type==='member' ? (receiptByMember[a.person_id] || []) : []),
+          ...(docByPerson[pk] || [])
+        ];
+        records.push({
+          attendance_id: a.id,
+          person_type: a.person_type,
+          person_id: a.person_id,
+          name: p.name || '',
+          tel: p.tel || '',
+          invited_by: a.person_type==='guest' ? (p.invited_by || '') : '',
+          payment: a.payment || '',
+          payment_method: a.payment_method || '',
+          arrival_time: a.arrival_time || '',
+          price_tier: a.price_tier || '',
+          table_number: a.table_number || '',
+          seat_order: a.seat_order,
+          receipts: receipts,
+          receipt_count: receipts.length
+        });
+      }
+
+      const stats = {
+        total: records.length,
+        paid: records.filter(r=>r.payment==='paid').length,
+        free: records.filter(r=>r.payment==='free').length,
+        unpaid: records.filter(r=>r.payment!=='paid'&&r.payment!=='free').length,
+        with_receipt: records.filter(r=>r.receipt_count>0).length,
+        without_receipt: records.filter(r=>r.receipt_count===0).length
+      };
+
+      return Response.json({
+        ok: true,
+        meeting: { id: meeting.id, date: meeting.date, type: meeting.type },
+        stats,
+        records
+      }, { headers: cors });
+    }
+
     if (action === 'list_tables') {
       const { meeting_id } = body;
       let mid = meeting_id;
@@ -785,7 +879,7 @@ export async function onRequest(context) {
       }, { headers: cors });
     }
 
-    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, create_meeting, update_meeting, delete_meeting, payment_summary, list_attendance, list_members, list_guests, create_member, update_member, create_guest, update_guest, add_to_meeting, delete_person, delete_attendance, delete_attendance_batch, get_settings, update_settings, export_stats, bulk_create_members, upload_image, list_tables, update_table_names, auto_seat, move_table` }, { headers: cors });
+    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, create_meeting, update_meeting, delete_meeting, payment_summary, list_attendance, list_members, list_guests, create_member, update_member, create_guest, update_guest, add_to_meeting, delete_person, delete_attendance, delete_attendance_batch, get_settings, update_settings, export_stats, bulk_create_members, upload_image, list_tables, update_table_names, auto_seat, move_table, payment_audit` }, { headers: cors });
 
   } catch (e) {
     return Response.json({ ok: false, error: e.message }, { headers: cors });
