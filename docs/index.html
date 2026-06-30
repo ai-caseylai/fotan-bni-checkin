@@ -26,12 +26,13 @@
 <body>
   <div id="list">
     <h1>📖 火炭會聚會 — 使用文件</h1>
-    <p class="sub">v3.7 · 選擇一份文件查看</p>
+    <p class="sub">v3.14 · 選擇一份文件查看</p>
     <div class="cards">
       <a class="card" href="?doc=user">
         <div class="icon">📱</div>
         <h2>使用手冊</h2>
         <p>嘉賓簽到主頁操作說明 · 付款流程 · Tab Bar · 資料卡</p>
+        <small style="color:#6366f1;margin-right:8px" onclick="event.preventDefault();event.stopPropagation();window.open('/docs/user-guide.html')">🌐 HTML 版</small>
         <small style="color:#6366f1" onclick="event.preventDefault();event.stopPropagation();window.open('/docs/fotan-使用手冊.pdf')">📥 PDF</small>
       </a>
       <a class="card" href="?doc=admin">
@@ -65,8 +66,8 @@
   <div class="lightbox" id="lb" onclick="this.style.display='none'"><img id="lb-img"></div>
 
   <script>
-    const screenshots = ['main-page','unchecked-tab','payment-page','confirm-checkin','checkin-done','checked-tab','person-card','admin-login','admin-overview','admin-checkin','admin-payment-modal','admin-meetings','admin-members','admin-guests','admin-settings','admin-skill','admin-chatbot'];
-    const labels = { 'main-page':'主頁','unchecked-tab':'未簽到 Tab','payment-page':'付款頁面','confirm-checkin':'確認簽到','checkin-done':'簽到完成','checked-tab':'已簽到 Tab','person-card':'個人資料卡','admin-login':'後台登入','admin-overview':'總覽','admin-checkin':'簽到操作','admin-payment-modal':'付款模態頁','admin-meetings':'會議管理','admin-members':'會員管理','admin-guests':'來賓管理','admin-settings':'系統設定','admin-skill':'Skill 頁面','admin-chatbot':'Chatbot 面板'};
+    const screenshots = ['01-簽到首頁-未簽到','03-已簽到名單','04-節目流程','05-遊戲資訊','06-委員介紹','07-後台總覽','08-簽到操作','09-會議管理','10-會員管理','11-來賓管理','12-餐桌排位','13-系統設定'];
+    const labels = { '01-簽到首頁-未簽到':'簽到主頁','03-已簽到名單':'已簽到名單','04-節目流程':'節目流程','05-遊戲資訊':'遊戲資訊','06-委員介紹':'委員介紹','07-後台總覽':'後台總覽','08-簽到操作':'簽到操作','09-會議管理':'會議管理','10-會員管理':'會員管理','11-來賓管理':'來賓管理','12-餐桌排位':'餐桌排位','13-系統設定':'系統設定' };
 
     async function loadDoc(name) {
       const files = { user: 'USER_GUIDE.md', admin: 'ADMIN_GUIDE.md', api: 'API.md', developer: 'DEVELOPER.md', requirements: 'REQUIREMENTS.md' };
