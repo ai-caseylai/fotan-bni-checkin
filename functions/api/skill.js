@@ -463,6 +463,51 @@ export async function onRequest(context) {
       return Response.json({ ok: true, attendance_id: result.meta.last_row_id, message: '已加入會議 #' + mid + '（' + person_type + ' #' + person_id + '）' }, { headers: cors });
     }
 
+    // ── link_cert ──────────────────────────────────────
+    if (action === 'link_cert') {
+      const { cert_id, person_type, person_id, person_name } = body;
+      if (!cert_id) return Response.json({ ok: false, error: 'cert_id required' }, { headers: cors });
+      if (!person_type || !person_id) return Response.json({ ok: false, error: 'person_type and person_id required' }, { headers: cors });
+      const cert = await env.DB.prepare('SELECT * FROM whatsapp_cert WHERE id=?').bind(cert_id).first();
+      if (!cert) return Response.json({ ok: false, error: 'cert not found' }, { headers: cors });
+      await env.DB.prepare(
+        'UPDATE whatsapp_cert SET person_type=?, person_id=?, person_name=? WHERE id=?'
+      ).bind(person_type, person_id, person_name || '', cert_id).run();
+      // Fill in payment_method if blank
+      const att = await env.DB.prepare(
+        'SELECT id, payment_method FROM attendance WHERE meeting_id=(SELECT meeting_id FROM guests WHERE id=? LIMIT 1) AND person_type=? AND person_id=?'
+      ).bind(person_id, person_type, person_id).first();
+      if (att) {
+        await env.DB.prepare(
+          "UPDATE attendance SET payment_method='receipt_uploaded' WHERE id=? AND (payment_method IS NULL OR payment_method='')"
+        ).bind(att.id).run();
+      }
+      return Response.json({ ok: true, message: '已關聯 ' + cert.from_number + ' 憑證到 ' + (person_name || person_type+'#'+person_id) }, { headers: cors });
+    }
+
+    // ── unlink_cert ────────────────────────────────────
+    if (action === 'unlink_cert') {
+      const { cert_id } = body;
+      if (!cert_id) return Response.json({ ok: false, error: 'cert_id required' }, { headers: cors });
+      await env.DB.prepare(
+        "UPDATE whatsapp_cert SET person_type='', person_id=0, person_name='' WHERE id=?"
+      ).bind(cert_id).run();
+      return Response.json({ ok: true, message: '已取消關聯' }, { headers: cors });
+    }
+
+    // ── list_certs ─────────────────────────────────────
+    if (action === 'list_certs') {
+      const { from_number, person_type, person_id, unlinked } = body;
+      let sql = 'SELECT * FROM whatsapp_cert WHERE 1=1';
+      const params = [];
+      if (from_number) { sql += ' AND from_number=?'; params.push(from_number); }
+      if (person_type && person_id) { sql += ' AND person_type=? AND person_id=?'; params.push(person_type, person_id); }
+      if (unlinked) { sql += " AND (person_type='' OR person_id=0)"; }
+      sql += ' ORDER BY created_at DESC LIMIT 200';
+      const rows = await env.DB.prepare(sql).bind(...params).all();
+      return Response.json({ ok: true, certs: rows.results, count: rows.results.length }, { headers: cors });
+    }
+
     // ── list_members ──────────────────────────────────
     if (action === 'list_members') {
       const rows = await env.DB.prepare('SELECT * FROM members WHERE active=1 ORDER BY id').all();
@@ -879,7 +924,7 @@ export async function onRequest(context) {
       }, { headers: cors });
     }
 
-    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, create_meeting, update_meeting, delete_meeting, payment_summary, list_attendance, list_members, list_guests, create_member, update_member, create_guest, update_guest, add_to_meeting, delete_person, delete_attendance, delete_attendance_batch, get_settings, update_settings, export_stats, bulk_create_members, upload_image, list_tables, update_table_names, auto_seat, move_table, payment_audit` }, { headers: cors });
+    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, create_meeting, update_meeting, delete_meeting, payment_summary, list_attendance, list_members, list_guests, create_member, update_member, create_guest, update_guest, add_to_meeting, delete_person, delete_attendance, delete_attendance_batch, get_settings, update_settings, export_stats, bulk_create_members, upload_image, list_tables, update_table_names, auto_seat, move_table, payment_audit, link_cert, unlink_cert, list_certs` }, { headers: cors });
 
   } catch (e) {
     return Response.json({ ok: false, error: e.message }, { headers: cors });
