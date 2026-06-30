@@ -540,7 +540,7 @@ export async function onRequest(context) {
         'SELECT a.* FROM attendance a WHERE a.meeting_id=? ORDER BY a.person_type, a.person_id'
       ).bind(mid).all();
 
-      // Get all linked receipt images
+      // Get all linked receipt images from DB
       const wcerts = await env.DB.prepare(
         "SELECT id, from_number, filename, r2_key, comment, note, person_type, person_id, person_name FROM whatsapp_cert WHERE person_type != '' AND person_id != 0"
       ).all();
@@ -548,6 +548,16 @@ export async function onRequest(context) {
       const docs = await env.DB.prepare(
         "SELECT * FROM documents WHERE person_type IN ('member','guest')"
       ).all();
+
+      // R2: find checkin-upload receipt images (receipt-att-{att_id}.jpg)
+      const r2Receipts = {};
+      try {
+        const r2List = await env.R2.list({ prefix: 'receipt-att-' });
+        for (const obj of r2List.objects) {
+          const m = obj.key.match(/receipt-att-(\d+)/);
+          if (m) r2Receipts[parseInt(m[1])] = { type: 'checkin_upload', r2_key: obj.key, image_url: '/api/image?name='+obj.key, size: obj.size };
+        }
+      } catch (e) { /* R2 list may fail, skip */ }
 
       // Build person name lookup
       const members = await env.DB.prepare('SELECT id, name, tel FROM members').all();
@@ -575,6 +585,11 @@ export async function onRequest(context) {
         docByPerson[k].push({ type: 'document', id: d.id, filename: d.filename, r2_key: d.r2_key, image_url: '/api/image?name='+d.r2_key });
       }
 
+      // Also collect ALL whatsapp certs (including unlinked) for the source summary
+      const allWcerts = await env.DB.prepare('SELECT id, person_type, person_id FROM whatsapp_cert').all();
+      const linkedWcerts = allWcerts.results.filter(w => w.person_type && w.person_id);
+      const unlinkedWcerts = allWcerts.results.filter(w => !w.person_type || !w.person_id);
+
       const records = [];
       for (const a of att.results) {
         const pk = a.person_type+':'+a.person_id;
@@ -584,6 +599,8 @@ export async function onRequest(context) {
           ...(a.person_type==='member' ? (receiptByMember[a.person_id] || []) : []),
           ...(docByPerson[pk] || [])
         ];
+        // Add R2 checkin-upload receipt if exists for this attendance
+        if (r2Receipts[a.id]) receipts.push(r2Receipts[a.id]);
         records.push({
           attendance_id: a.id,
           person_type: a.person_type,
@@ -611,10 +628,20 @@ export async function onRequest(context) {
         without_receipt: records.filter(r=>r.receipt_count===0).length
       };
 
+      // Receipt source summary
+      const sourceSummary = {
+        whatsapp_linked: linkedWcerts.length,
+        whatsapp_unlinked: unlinkedWcerts.length,
+        member_receipts: mreceipts.results.length,
+        documents: docs.results.length,
+        checkin_uploads: Object.keys(r2Receipts).length
+      };
+
       return Response.json({
         ok: true,
         meeting: { id: meeting.id, date: meeting.date, type: meeting.type },
         stats,
+        source_summary: sourceSummary,
         records
       }, { headers: cors });
     }
