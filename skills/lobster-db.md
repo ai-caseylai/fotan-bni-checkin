@@ -1,9 +1,9 @@
 ---
 name: fotan-skill
-description: 火炭會聚會簽到系統 v3.13 — 31 Skill Actions · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
+description: 火炭會聚會簽到系統 v3.14 — 31 Skill Actions · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
 ---
 
-# 火炭會 Skill v3.13
+# 火炭會 Skill v3.14
 
 ## Token 驗證
 ```bash
