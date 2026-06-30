@@ -13,10 +13,10 @@ export async function onRequest(context) {
   const doc = {
     system: {
       name: '火炭會聚會簽到系統 (Fotan BNI Check-in)',
-      version: '3.10',
+      version: '3.14',
       base_url: 'https://fotan.techforliving.net',
       api_base: 'https://fotan.techforliving.net/api',
-      description: '香港火炭商會每月聚會簽到及管理系統',
+      description: '火炭會聚會簽到及管理系統，35 個 Skill Actions',
     },
     authentication: {
       admin_ui: 'Cookie fotan_auth（登入取得，HttpOnly，24h 有效）',
@@ -91,7 +91,7 @@ export async function onRequest(context) {
       '/api/skill': {
         methods: 'POST',
         auth: 'Token（JSON body token 欄位）',
-        description: '17 種操作，見下方 skill_actions',
+        description: '35 種操作，見下方 skill_actions',
       },
       '/api/skill-tokens': {
         methods: 'GET,POST,DELETE',
@@ -143,6 +143,13 @@ export async function onRequest(context) {
         body: '{data（base64）}',
         description: 'AI 圖片分析（Qwen VL）',
       },
+      '/api/whatsapp-cert': {
+        methods: 'GET,POST,PUT,DELETE',
+        auth: 'POST 需 Token，GET/PUT/DELETE 需 Cookie',
+        get: { params: '?id=X 或 ?missing=1（最新會議未關聯人員）' },
+        post: { body: '{token,from_number,data（base64）,comment,note,person_type,person_id,person_name}' },
+        put: { body: '{id,person_type,person_id,person_name,comment,note}' },
+      },
       '/api/doc': {
         methods: 'GET',
         auth: 'None',
@@ -151,23 +158,46 @@ export async function onRequest(context) {
       },
     },
     skill_actions: {
-      import_guests: '批次匯入來賓 {guests:[{name,professional,payment}]}',
+      // 會員
+      list_members: '列出所有活躍會員',
+      create_member: '新增會員 {name,tel,email,professional,role,tags}',
       bulk_create_members: '批次匯入會員 {members:[{name,tel,email,professional,role}]}',
-      create_member: '新增會員 {name,tel,professional,role}',
-      update_member: '更新會員 {member_id,name,tel,...}',
-      update_guest: '更新來賓 {guest_id,name,professional,...}',
-      delete_person: '刪除人員 {person_type,person_id}',
-      search: '搜尋人員 {q}',
-      update_payment: '更新付款 {attendance_id,payment（paid/free/unpaid）}',
-      update_table: '設定枱號/座位 {meeting_id,person_type,person_id,table_number,seat_order}',
-      mark_arrival: '標記簽到 {attendance_id,arrival_time（HH:MM 或 absent）} — 未付款不能簽到',
-      list_meetings: '列出所有會議',
-      update_meeting: '更新會議 {meeting_id,date,type,guest_fee,member_fee,committee_fee,...}',
+      update_member: '更新會員 {member_id,name,tel,email,professional,role,tags,bio,fee_paid_date,table_number,seat_order,active}',
+      delete_person: '軟刪除人員 {person_type,person_id}（active=0，保留 attendance+payment）',
+      // 來賓
+      list_guests: '列出所有活躍來賓',
+      create_guest: '新增來賓+attendance {name,professional,tel,invited_by,vip,payment,table_number,seat_order}',
+      import_guests: '批次匯入來賓 {guests:[{name,professional,tel,invited_by,payment,vip}]}',
+      update_guest: '更新來賓 {guest_id,name,professional,tel,invited_by,vip,table_number,seat_order}',
+      // 會議
+      list_meetings: '列出所有會議（含 stats）',
+      create_meeting: '建立會議 {date,type,collector,guest_fee,member_fee,committee_fee,early_bird_fee,walk_in_fee}',
+      update_meeting: '更新會議 {meeting_id,date,type,...}',
+      delete_meeting: '⚠️ 硬刪除會議+全部 attendance',
       meeting_stats: '會議統計（含 revenue，只計 paid）',
-      payment_summary: '付款摘要',
+      // 出席
+      add_to_meeting: '將人員加入會議 {person_type,person_id,payment,table_number,seat_order}',
       list_attendance: '出席名單（含姓名、付款、枱號、座位）',
-      get_settings: '系統設定（含枱名 seating_names_{meeting_id}）',
-      update_settings: '更新設定 {settings:{key:value}} — 可設枱名 seating_names_{meeting_id}',
+      update_payment: '更新付款 {attendance_id,payment（paid/free/unpaid）,price_tier}',
+      mark_arrival: '標記簽到 {attendance_id,arrival_time（HH:MM 或 absent）} — 未付款不能簽到',
+      payment_summary: '付款摘要',
+      delete_attendance: '軟清除單條 attendance（保留 payment）',
+      delete_attendance_batch: '批次軟清除 {ids:[1,2,3]}（保留 payment）',
+      // 排位
+      list_tables: '完整枱號地圖（枱名+人員+座位+未排位名單）',
+      update_table_names: '設定枱名 {meeting_id,names:{"1":"VIP枱","2":"主家席"}}',
+      update_table: '單人枱號+座位 {meeting_id,person_type,person_id,table_number,seat_order}',
+      auto_seat: '自動排位 {group:committee/vip/member/guest/surname/tag,table_number,max_per_table}',
+      move_table: '整枱搬人 {from_table,to_table,force}',
+      // 憑證關聯（NEW v3.14）
+      list_certs: '列出 whatsapp_cert 憑證 {from_number,person_type,person_id,unlinked}',
+      link_cert: '關聯憑證到人員 {cert_id,person_type,person_id,person_name}',
+      unlink_cert: '取消憑證關聯 {cert_id}',
+      payment_audit: '付款審計對數 {meeting_id} — 四來源收據合併+source_summary',
+      // 系統
+      search: '搜尋人員 {q}（跨 members+guests）',
+      get_settings: '查詢系統設定',
+      update_settings: '更新設定 {settings:{key:value}}',
       export_stats: '綜合統計匯出',
       upload_image: '上傳圖片到 R2 {name,data,content_type}',
     },
@@ -176,7 +206,10 @@ export async function onRequest(context) {
       'get_member_detail', 'get_guest_list', 'get_payment_summary', 'get_industry_list',
       'add_guest', 'bulk_add_guests', 'add_meeting', 'update_payment', 'update_table',
       'mark_arrival', 'get_settings', 'update_settings', 'delete_attendance', 'get_receipts',
-      'create_member', 'update_member', 'bulk_create_members', 'upload_image'
+      'create_member', 'update_member', 'bulk_create_members', 'upload_image',
+      'list_all_members', 'list_all_guests', 'add_guest_to_meeting', 'add_person_to_meeting',
+      'delete_meeting', 'create_meeting', 'update_table_names', 'auto_seat', 'move_table',
+      'list_tables', 'update_member'
     ],
     pricing_tiers: {
       committee: { condition: "role IN ('主席','副主席','秘書長','幹事') OR price_tier='committee'", fee_field: 'committee_fee', default: 220 },
@@ -197,16 +230,17 @@ export async function onRequest(context) {
       unpaid: '❌💰 未付款',
     },
     important_notes: [
+      'v3.14 新增憑證關聯 API：link_cert / unlink_cert / list_certs / payment_audit',
+      'v3.14 payment_audit 四來源合併：whatsapp_cert + member_receipts + documents + R2 receipt-att-*.jpg',
+      'v3.14 簽到頁修復：移除 table_number 過濾 + 搜尋欄 IME 中文輸入支援 + 持久化 DOM',
       'v3.7 起 revenue 只計算 payment=paid，不含 free',
       'v3.8 簽到操作：未付款不能簽到（全線 API + 前端 + chatbot + skill 已統一）',
       'v3.8 嘉賓 VIP 欄位：guests.vip（1=嘉賓 ⭐，0=來賓 🚶）',
       'v3.8 委員角色：主席/副主席/秘書長/幹事，委員價 $220',
-      'v3.10 座位次序：attendance/members/guests 新增 seat_order INTEGER，排位頁支援枱內排序',
-      'v3.10 枱名 API：settings 表 seating_names_{meeting_id} 儲存枱名 JSON，支援跨瀏覽器同步',
+      'v3.10 座位次序：attendance/members/guests 新增 seat_order INTEGER',
+      'v3.10 枱名 API：settings 表 seating_names_{meeting_id} 儲存枱名 JSON',
       'meeting_stats、stats、meetings 三個端點的 revenue 計算已全線同步',
-      '部署必須使用 wrangler@3（v4.100.0 有 Functions 遺失 bug）',
-      'group JID 含 "-" 或以 "120363" 開頭且長度 > 15 需加 @g.us 後綴',
-      'raw.timestamp 的 Z 後綴是錯的，用 Info.Timestamp（帶 -03:00）',
+      '部署使用 npx wrangler pages deploy . --project-name fotan --branch main --commit-dirty',
     ],
   };
 
