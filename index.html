@@ -88,6 +88,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 <body>
 <div id="app">
 <div id="top"><h1>火炭會聚會 <span style="font-size:10px;opacity:.5">v3.0</span></h1><div id="sub"></div></div>
+<div id="search-bar" style="display:none"><div class="hdr" id="list-hdr"><span>未簽到嘉賓</span><span class="cnt">0 / 0</span></div><div style="padding:8px 16px"><input id="search-input" type="text" placeholder="搜尋名字/電話/行業/職位..." style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;outline:none;background:var(--bg)"></div></div>
 <div id="main"></div>
 <div id="bar"><button id="bar-unchecked" class="tab-item active" onclick="switchTab('unchecked')"><span class="tab-icon">👥</span><span>未簽到</span></button><button id="bar-checked" class="tab-item" onclick="switchTab('checked')"><span class="tab-icon">✅</span><span>已簽到</span></button><button class="tab-item" onclick="showSchedule()"><span class="tab-icon">📋</span><span>流程</span></button><button class="tab-item" onclick="showGame()"><span class="tab-icon">🎮</span><span>遊戲</span></button><button class="tab-item" onclick="showProductIntro()"><span class="tab-icon">🏅</span><span>委員介紹</span></button><button class="tab-item" onclick="showAlbum()"><span class="tab-icon">📸</span><span>相簿</span></button></div>
 </div>
@@ -135,6 +136,10 @@ function init(){
     // Check cookie for previous check-in
     var ck=C('fotan_ci');
     if(ck){try{var ci=JSON.parse(ck);if(ci.mid===meeting.id){locked=true;last=ci;}}catch(e){}}
+    document.getElementById('search-bar').style.display='block';
+    var si=document.getElementById('search-input');
+    si.value='';searchQ='';
+    si.addEventListener('input',function(){searchQ=this.value;render();});
     render();
   });
 }
@@ -261,7 +266,7 @@ function allPeople(){
   members.forEach(function(p){if(map['member_'+p.id])all.push({p:p,type:'member',label:'會員',att:map['member_'+p.id]})});
   guests.forEach(function(p){if(map['guest_'+p.id])all.push({p:p,type:'guest',label:'來賓',att:map['guest_'+p.id]})});
   // Show all people with a table assignment in this meeting
-  all=all.filter(function(x){return !!(x.att&&x.att.table_number);});
+  // Show all people (not just those with table assignments)
   all.sort(function(a,b){return (a.p.name||'').localeCompare(b.p.name||'')});
   return all;
 }
@@ -335,7 +340,6 @@ if(D.aliLink)h+='<a href="javascript:void(0)" onclick="showAlipayQR('+fee+')" st
       });
     });
   } else {
-    // Filter by search query
     var filtered=all;
     if(searchQ){
       var q=searchQ.toLowerCase();
@@ -347,9 +351,9 @@ if(D.aliLink)h+='<a href="javascript:void(0)" onclick="showAlipayQR('+fee+')" st
           (x.p.email||'').toLowerCase().indexOf(q)!==-1;
       });
     }
-    main.innerHTML='<div class="hdr"><span>未簽到嘉賓</span><span class="cnt">'+filtered.length+' / '+total+'</span></div>'+
-      '<div style="padding:8px 16px"><input id="search-input" type="text" placeholder="搜尋名字/電話/行業/職位..." value="'+E(searchQ)+'" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;outline:none;background:var(--bg)" oninput="searchQ=this.value;render()"></div>'+
-      filtered.map(function(x){return renderRow(x);}).join('');
+    var hdr=document.getElementById('list-hdr');
+    if(hdr)hdr.innerHTML='<span>未簽到嘉賓</span><span class="cnt">'+filtered.length+' / '+total+'</span>';
+    main.innerHTML=filtered.map(function(x){return renderRow(x);}).join('');
     main.querySelectorAll('.row').forEach(function(row){
       row.addEventListener('click',function(){
         if(locked)return;
