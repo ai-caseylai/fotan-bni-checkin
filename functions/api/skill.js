@@ -571,18 +571,18 @@ export async function onRequest(context) {
       for (const w of wcerts.results) {
         const k = w.person_type+':'+w.person_id;
         if (!wcertByPerson[k]) wcertByPerson[k] = [];
-        wcertByPerson[k].push({ type: 'whatsapp', id: w.id, from_number: w.from_number, r2_key: w.r2_key, image_url: '/api/image?name='+w.r2_key, comment: w.comment, note: w.note });
+        wcertByPerson[k].push({ type: 'whatsapp', id: w.id, from_number: w.from_number, r2_key: w.r2_key, image_url: '/api/image?name='+w.r2_key, download_url: '/api/image?name='+w.r2_key+'&download=1', comment: w.comment, note: w.note });
       }
       const receiptByMember = {};
       for (const r of mreceipts.results) {
         if (!receiptByMember[r.member_id]) receiptByMember[r.member_id] = [];
-        receiptByMember[r.member_id].push({ type: 'member_receipt', id: r.id, filename: r.filename, image_url: '/api/image?name='+r.filename });
+        receiptByMember[r.member_id].push({ type: 'member_receipt', id: r.id, filename: r.filename, image_url: '/api/image?name='+r.filename, download_url: '/api/image?name='+r.filename+'&download=1'});
       }
       const docByPerson = {};
       for (const d of docs.results) {
         const k = d.person_type+':'+d.person_id;
         if (!docByPerson[k]) docByPerson[k] = [];
-        docByPerson[k].push({ type: 'document', id: d.id, filename: d.filename, r2_key: d.r2_key, image_url: '/api/image?name='+d.r2_key });
+        docByPerson[k].push({ type: 'document', id: d.id, filename: d.filename, r2_key: d.r2_key, image_url: '/api/image?name='+d.r2_key, download_url: '/api/image?name='+d.r2_key+'&download=1'});
       }
 
       // Also collect ALL whatsapp certs (including unlinked) for the source summary
