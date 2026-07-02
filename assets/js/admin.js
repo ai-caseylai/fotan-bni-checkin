@@ -9,7 +9,6 @@ let ciViewMode = 'card';
 let mgmtViewMode = 'card';
 let ciPollTimer = null;
 let ciLastHash = '';
-function isAbsent(t) { return t === 'absent' || (t && t.startsWith && t.startsWith('absent|')); }
 
 async function doLogin() {
   const pwd = document.getElementById('login-pwd').value;
@@ -123,7 +122,7 @@ async function renderOverview(pc) {
     var unpaidGuestCount = unpaidArr.filter(function(a){return a.person_type==='guest'}).length;
     var memberCount = att.filter(function(a){return a.person_type==='member'}).length;
     var guestCount = att.filter(function(a){return a.person_type==='guest'}).length;
-    var arrivedCount = att.filter(function(a){return a.arrival_time&&!isAbsent(a.arrival_time)}).length;
+    var arrivedCount = att.filter(function(a){return a.arrival_time&&a.arrival_time!=='absent'}).length;
     var committeeCount = att.filter(function(a){return a.price_tier==='committee' || (a.person_type==='member' && memberRoleMap[a.person_id] && memberRoleMap[a.person_id]!=='會員');}).length;
     var regularMemberCount = memberCount - committeeCount;
     var revenue = current.stats?.revenue || stats.revenue || 0;
@@ -237,7 +236,7 @@ async function renderSeating(pc) {
 
     att.forEach(function(a){
       var p = pLookup[a.person_type+'_'+a.person_id] || {};
-      var absent = isAbsent(a.arrival_time);
+      var absent = a.arrival_time === 'absent';
 	      var tbl = a.table_number || '';
       if (tbl && /^\d+\.0$/.test(tbl)) tbl = String(parseInt(tbl));
       var entry = {
@@ -793,7 +792,7 @@ async function renderOverviewCharts(mts) {
   }
   const paid = allAtt.filter(a => a.payment && a.payment !== 'unpaid' && a.payment !== '').length;
   const unpaid = allAtt.filter(a => a.arrival_time && a.arrival_time !== 'absent' && (!a.payment || a.payment === 'unpaid' || a.payment === '')).length;
-  const absent = allAtt.filter(a => isAbsent(a.arrival_time)).length;
+  const absent = allAtt.filter(a => a.arrival_time === 'absent').length;
 
   const ctx2 = document.getElementById('chart-payment');
   if (ctx2) {
@@ -833,7 +832,7 @@ async function toggleOverviewMeeting(mid) {
       const p = getName(a.person_type, a.person_id);
       const name = p?p.name:'?';
       const paid = a.payment && a.payment!=='unpaid' && a.payment!=='';
-      const absent = isAbsent(a.arrival_time);
+      const absent = a.arrival_time === 'absent';
       var safeName = esc(name).replace(/'/g,"\\'");
       return '<div class="ov-person-card" style="cursor:pointer" onclick="event.stopPropagation();showOverviewPayOps(\''+a.person_type+'\','+a.person_id+','+a.id+',\''+safeName+'\','+paid+')">'+
         '<div class="pc-av '+a.person_type+'" style="width:32px;height:32px;font-size:13px">'+esc(name.charAt(0))+'</div>'+
@@ -1142,7 +1141,7 @@ async function toggleMeetingRow(mid) {
     html += sorted.map(function(a){
       var ptype = a.person_type;
 var pname = getName(ptype, a.person_id);
-      var absent = isAbsent(a.arrival_time);
+      var absent = a.arrival_time === 'absent';
       var unpaid = !a.payment || a.payment === 'unpaid' || a.payment === '';
       var payCls = absent ? 'absent' : (a.payment==='free'?'free':(a.payment==='paid'?'paid':'unpaid'));
       var onclick = '';
@@ -1368,7 +1367,7 @@ async function renderTableBody(type, list) {
           const items = sorted.map(a => {
             var payIcon = a.payment==='paid'?'💰':(a.payment==='free'?'🆓':'❌💰');
             var payColor = a.payment==='paid'||a.payment==='free'?'#10b981':'#f59e0b';
-            var arrived = a.arrival_time && !isAbsent(a.arrival_time);
+            var arrived = a.arrival_time && a.arrival_time!=='absent';
             var absent = a.arrival_time==='absent';
             var arrIcon = arrived?'✅':(absent?'✕':'');
             return '<span style="color:'+payColor+'">'+a.date+' '+payIcon+'</span>'+(arrIcon?' <span>'+arrIcon+'</span>':'');
@@ -1708,7 +1707,7 @@ function renderCheckinOpList() {
       sec.list.forEach(p => {
         const att = attMap[`${sec.key}_${p.id}`];
         const paid = att && att.payment && att.payment !== '' && att.payment !== 'unpaid';
-        const absent = att && isAbsent(att.arrival_time);
+        const absent = att && att.arrival_time === 'absent';
         html += '<tr style="cursor:pointer;background:'+(absent?'#f8fafc':'')+'" onclick="autoArriveAndShow(\''+sec.key+'\','+p.id+',\''+esc(p.name)+'\')">';
         html += '<td style="padding:6px 8px"><div class="pc-av '+sec.key+'" style="width:22px;height:22px;font-size:10px;display:inline-flex">'+esc(p.name.charAt(0))+'</div></td>';
         html += '<td style="padding:6px 8px;font-weight:600;font-size:12px">'+esc(p.name)+'</td>';
@@ -1734,7 +1733,7 @@ function renderCheckinOpList() {
       sec.list.forEach(p => {
         const att = attMap[`${sec.key}_${p.id}`];
         const paid = att && att.payment && att.payment !== '' && att.payment !== 'unpaid';
-        const absent = att && isAbsent(att.arrival_time);
+        const absent = att && att.arrival_time === 'absent';
         html += '<div class="person-card'+(att?(absent?' absent':(paid?' has-att paid':' has-att unpaid')):'')+'" onclick="autoArriveAndShow(\''+sec.key+'\','+p.id+',\''+esc(p.name)+'\')" style="cursor:pointer">';
         html += '<div class="pc-av '+sec.key+'">'+esc(p.name.charAt(0))+'</div>';
         html += '<div class="pc-name">'+esc(p.name)+'</div>';
@@ -1846,7 +1845,7 @@ async function confirmCheckin(type, pid, name) {
 async function showCheckinPersonOps(type, pid, name) {
   const att = meetingAttendance.find(a => a.person_type === type && a.person_id === pid);
   const paid = att && att.payment && att.payment !== '' && att.payment !== 'unpaid';
-  const absent = att && isAbsent(att.arrival_time);
+  const absent = att && att.arrival_time === 'absent';
   // Load member receipts
   let receiptHtml = '';
   if (type === 'member') {
@@ -2436,7 +2435,7 @@ async function showPersonOps(type, pid) {
   if (!p) return;
   const att = meetingAttendance.find(a => a.person_type === type && a.person_id === pid);
   const paid = att && att.payment && att.payment !== '' && att.payment !== 'unpaid';
-  const absent = att && isAbsent(att.arrival_time);
+  const absent = att && att.arrival_time === 'absent';
 
   let receiptHtml = '';
   if (type === 'member') {
@@ -2726,14 +2725,7 @@ function formatFileSize(bytes) {
 async function renderWaCertPage(pc) {
   pc.innerHTML = `<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">💰 入錢憑證</h2>
     <div class="panel">
-      <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between">
-        <h2>📋 已上傳憑證</h2>
-        <select id="wacert-filter" onchange="loadWaCerts()" style="font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid var(--border)">
-          <option value="all">全部</option>
-          <option value="photo">有圖片</option>
-          <option value="text">純文字</option>
-        </select>
-      </div>
+      <div class="panel-header"><h2>📋 已上傳憑證</h2></div>
       <div class="panel-body" style="padding:0">
         <table class="data-table">
           <thead><tr><th>縮圖</th><th>來自那個WhatsApp</th><th>關聯的嘉賓</th><th>相片備註</th><th>日期</th><th></th></tr></thead>
@@ -2748,30 +2740,21 @@ async function loadWaCerts() {
   try {
     const rows = await fetch('/api/whatsapp-cert').then(r => r.json());
     const el = document.getElementById('wacert-list');
-    const filter = document.getElementById('wacert-filter')?.value || 'all';
-    let filtered = rows;
-    if (filter === 'photo') filtered = rows.filter(r => r.r2_key);
-    else if (filter === 'text') filtered = rows.filter(r => !r.r2_key);
-    if (!filtered.length) { el.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2)">暫無憑證</td></tr>'; return; }
-    el.innerHTML = filtered.map(r => {
-      const isTextOnly = !r.r2_key;
-      const thumb = isTextOnly
-        ? '<span style="display:flex;align-items:center;justify-content:center;width:60px;height:60px;background:#f1f5f9;border-radius:4px;border:1px dashed var(--border);font-size:20px;margin:0 auto">📝</span>'
-        : `<a href="/api/image?name=${esc(r.r2_key)}" target="_blank"><img src="/api/image?name=${esc(r.r2_key)}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border)"></a>`;
-      return `<tr style="${isTextOnly ? 'background:#fffbeb' : ''}">
-        <td>${thumb}</td>
-        <td style="font-size:12px">${esc(r.from_number||'—')}</td>
-        <td style="font-weight:${r.person_name?'600':'400'};color:${r.person_name?'var(--text)':'var(--text3)'}">${esc(r.person_name||'未關聯')}</td>
-        <td style="max-width:160px;white-space:pre-wrap;word-break:break-word;cursor:pointer" onclick="editCertComment(${r.id},'${esc(r.comment||'')}')" title="點擊修改備註">${esc(r.comment||'—')}${isTextOnly && r.note ? '<br><span style="font-size:10px;color:var(--text3)">'+esc(r.note)+'</span>' : ''}</td>
-        <td style="font-size:11px">${esc((r.created_at||'').substring(0,16))}</td>
-        <td>
-          ${r.person_name
-            ? `<button class="btn btn-sm" style="background:#f59e0b;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="unlinkWaCert(${r.id})">取消關聯</button>`
-            : `<button class="btn btn-sm" style="background:#3b82f6;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="showLinkCertModal(${r.id})">關聯來賓</button>
-               <button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button>`}
-        </td>
-      </tr>`;
-    }).join('');
+    if (!rows.length) { el.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2)">暫無憑證</td></tr>'; return; }
+    el.innerHTML = rows.map(r => `<tr>
+      <td>${r.r2_key ? `<a href="/api/image?name=${esc(r.r2_key)}" target="_blank"><img src="/api/image?name=${esc(r.r2_key)}" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border)"></a>` : '—'}</td>
+      <td style="font-size:12px">${esc(r.from_number||'—')}</td>
+      <td style="font-weight:${r.person_name?'600':'400'};color:${r.person_name?'var(--text)':'var(--text3)'}">${esc(r.person_name||'未關聯')}</td>
+      <td style="max-width:160px;white-space:pre-wrap;word-break:break-word;cursor:pointer" onclick="editCertComment(${r.id},'${esc(r.comment||'')}')" title="點擊修改備註">${esc(r.comment||'—')}</td>
+      <td style="font-size:11px">${esc((r.created_at||'').substring(0,16))}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" style="background:#10b981;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="window.open('/api/receipt-pdf?cert_id=${r.id}','_blank')">檢視收據</button>
+        ${r.person_name
+          ? `<button class="btn btn-sm" style="background:#f59e0b;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="unlinkWaCert(${r.id})">取消關聯</button>`
+          : `<button class="btn btn-sm" style="background:#3b82f6;color:#fff;font-size:10px;padding:2px 6px;margin-right:4px" onclick="showLinkCertModal(${r.id})">關聯來賓</button>
+             <button class="btn btn-danger btn-sm" onclick="deleteWaCert(${r.id})" style="font-size:10px;padding:2px 6px">刪除</button>`}
+      </td>
+    </tr>`).join('');
   } catch(e) { document.getElementById('wacert-list').innerHTML = '<tr><td colspan="6">載入失敗</td></tr>'; }
 }
 
@@ -2970,7 +2953,35 @@ async function deleteSkillToken(id) {
 }
 
 function downloadSkill() {
-  var content = '---\nname: fotan-skill\ndescription: 火炭會聚會簽到系統完整 Skill — 查詢、匯入、付款、會議、統計、枱號\n---\n\n# 火炭會 Skill\n\n## Token 驗證\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n所有請求格式：`POST https://fotan.techforliving.net/api/skill` + JSON body，必須帶 `token` 同 `action`。\n\n---\n\n## 嘉賓名單匯入\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{\n    "token": "YOUR_TOKEN",\n    "action": "import_guests",\n    "guests": [\n      {"name": "陳大文", "professional": "律師", "payment": "paid"},\n      {"name": "李小華", "professional": "會計師", "payment": "unpaid"},\n      {"name": "張三", "professional": "工程師", "payment": "free"}\n    ]\n  }\'\n```\n\n| 欄位 | 說明 |\n|------|------|\n| `name` | 姓名（必填） |\n| `professional` | 專業（可選） |\n| `payment` | `paid` / `unpaid` / `free` |\n| `tel` | 電話（可選） |\n| `invited_by` | 邀請人（可選） |\n\n**規則：** 自動用最新會議、跳過會員/來賓重複、如係會員會更新其 attendance 付款狀態。\n\n---\n\n## 更新付款狀態\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_payment", "attendance_id": 123, "payment": "paid"}\'\n```\n\n`payment` 值：`paid` / `free` / `unpaid`\n\n---\n\n## 更新枱號\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_table", "meeting_id": 10, "person_type": "member", "person_id": 26, "table_number": "5"}\'\n```\n\n---\n\n## 標記出席\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "mark_arrival", "attendance_id": 123, "arrival_time": "12:30"}\'\n```\n\n`arrival_time` 值：`HH:MM` 或 `absent`（缺席）\n\n---\n\n## 搜尋\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "search", "q": "陳"}\'\n```\n\n---\n\n## 會議統計\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "meeting_stats"}\'\n```\n\n---\n\n## 付款摘要\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "payment_summary"}\'\n```\n\n---\n\n## 會議列表\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n---\n\n## 出席名單\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_attendance"}\'\n```\n\n---\n\n## WhatsApp 入錢憑證\n\n```bash\n# 上傳純文字\ncurl -s -X POST "https://fotan.techforliving.net/api/whatsapp-cert" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "from_number": "85297188675", "comment": "已過數 $200"}\'\n\n# 上傳相片 + 備註 + 關聯來賓\ncurl -s -X POST "https://fotan.techforliving.net/api/whatsapp-cert" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "from_number": "85297188675", "data": "base64...", "comment": "收據", "note": "已確認", "person_type": "guest", "person_id": 5, "person_name": "陳大文"}\'\n\n# 查詢未關聯來賓\ncurl -s "https://fotan.techforliving.net/api/whatsapp-cert?missing=1"\n```\n\n| 欄位 | 說明 |\n|------|------|\n| `token` | 技能 Token（必填） |\n| `from_number` | WhatsApp 號碼（必填） |\n| `data` | Base64 相片（可選，純文字可省略） |\n| `comment` | 相片 caption 備註（可選） |\n| `note` | 額外文字備註（可選） |\n| `person_type` | `member` / `guest`（可選，上傳時可指定） |\n| `person_id` | 人員 ID（可選） |\n| `person_name` | 人員姓名（可選） |\n\n---\n\n## 手動 SQL（需要 Wrangler + Node.js）\n\n資料庫：D1 `fotan-db`\n```bash\nnpx wrangler d1 execute fotan-db --remote --command "<SQL>"\n```\n';
+  var content = '---\nname: fotan-skill\ndescription: 火炭會聚會簽到系統完整 Skill — 查詢、匯入、付款、會議、統計、枱號\n---\n\n# 火炭會 Skill\n\n## Token 驗證\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n所有請求格式：`POST https://fotan.techforliving.net/api/skill` + JSON body，必須帶 `token` 同 `action`。\n\n---\n\n## 🌟 嘉賓名單匯入\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{\n    "token": "YOUR_TOKEN",\n    "action": "import_guests",\n    "guests": [\n      {"name": "陳大文", "professional": "律師", "payment": "paid"},\n      {"name": "李小華", "professional": "會計師", "payment": "unpaid"},\n      {"name": "張三", "professional": "工程師", "payment": "free"}\n    ]\n  }\'\n```\n\n| 欄位 | 說明 |\n|------|------|\n| `name` | 姓名（必填） |\n| `professional` | 專業（可選） |\n| `payment` | `paid` / `unpaid` / `free` |\n| `tel` | 電話（可選） |\n| `invited_by` | 邀請人（可選） |\n\n**規則：** 自動用最新會議、跳過會員/來賓重複、如係會員會更新其 attendance 付款狀態。\n\n---\n\n## 💰 更新付款狀態\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_payment", "attendance_id": 123, "payment": "paid"}\'\n```\n\n`payment` 值：`paid` / `free` / `unpaid`\n\n---\n\n## 🍽️ 更新枱號\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_table", "meeting_id": 10, "person_type": "member", "person_id": 26, "table_number": "5"}\'\n```\n\n---\n\n## ✅ 標記出席\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "mark_arrival", "attendance_id": 123, "arrival_time": "12:30"}\'\n```\n\n`arrival_time` 值：`HH:MM` 或 `absent`（缺席）\n\n---\n\n## 🔍 搜尋\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "search", "q": "陳"}\'\n```\n\n---\n\n## 📊 會議統計\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "meeting_stats"}\'\n```\n\n---\n\n## 💳 付款摘要\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "payment_summary"}\'\n```\n\n---\n\n## 📋 會議列表\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n---\n\n## 👥 出席名單\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_attendance"}\'\n```\n\n---\n\n## 💬 WhatsApp 入錢憑證
+
+```bash
+# 上傳純文字
+curl -s -X POST "https://fotan.techforliving.net/api/whatsapp-cert" \\
+  -H "Content-Type: application/json" \\
+  -d '{"token": "YOUR_TOKEN", "from_number": "85297188675", "comment": "已過數 $200"}'
+
+# 上傳相片 + 備註 + 關聯來賓
+curl -s -X POST "https://fotan.techforliving.net/api/whatsapp-cert" \\
+  -H "Content-Type: application/json" \\
+  -d '{"token": "YOUR_TOKEN", "from_number": "85297188675", "data": "base64...", "comment": "收據", "note": "已確認", "person_type": "guest", "person_id": 5, "person_name": "陳大文"}'
+
+# 查詢未關聯來賓
+curl -s "https://fotan.techforliving.net/api/whatsapp-cert?missing=1"
+```
+
+| 欄位 | 說明 |
+|------|------|
+| `token` | 技能 Token（必填） |
+| `from_number` | WhatsApp 號碼（必填） |
+| `data` | Base64 相片（可選，純文字可省略） |
+| `comment` | 相片 caption 備註（可選） |
+| `note` | 額外文字備註（可選） |
+| `person_type` | `member` / `guest`（可選，上傳時可指定） |
+| `person_id` | 人員 ID（可選） |
+| `person_name` | 人員姓名（可選） |
+
+---\n\n## 🛠️ 手動 SQL（需要 Wrangler + Node.js）\n\n資料庫：D1 `fotan-db`\n```bash\nnpx wrangler d1 execute fotan-db --remote --command "<SQL>"\n```\n';
   var blob = new Blob([content], { type: 'text/markdown' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
