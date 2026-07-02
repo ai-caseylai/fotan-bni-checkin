@@ -1,9 +1,9 @@
 ---
 name: fotan-skill
-description: 火炭會聚會簽到系統 v3.14 — 35 Skill Actions · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
+description: 火炭會聚會簽到系統 v3.15 — 35 Skill Actions + PDF 收據 · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
 ---
 
-# 火炭會 Skill v3.14
+# 火炭會 Skill v3.15
 
 ## Token 驗證
 ```bash
@@ -353,6 +353,25 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN","action":"upload_image","name":"qr-alipay","data":"BASE64","content_type":"image/png"}'
 ```
+
+---
+
+## 🧾 PDF 收據
+
+### receipt_pdf — 生成 PDF 付款收據
+```bash
+curl -s -o receipt.pdf "https://fotan.techforliving.net/api/receipt-pdf?cert_id=5"
+```
+GET 端點，傳入 `cert_id`（whatsapp_cert.id），回傳 A4 中文 PDF 收據，包含：
+- 收據編號 + 發出日期
+- 付款人姓名 + WhatsApp 號碼
+- 付款憑證圖片（從 R2 讀取）
+- 備註 / 相片備註
+- 系統生成頁尾
+
+後台 admin.js 已在 WhatsApp 認證列表加入「檢視收據」按鈕，點擊即在新分頁開啟 PDF。
+
+依賴：`pdf-lib` + `@pdf-lib/fontkit`，中文字型執行期從 Google Fonts CDN 載入 NotoSansTC。
 
 ---
 
