@@ -28,7 +28,7 @@ export async function onRequest(context) {
             SUM(CASE WHEN person_type='guest' THEN 1 ELSE 0 END) as guests,
             SUM(CASE WHEN payment='paid' THEN 1 ELSE 0 END) as paid,
             SUM(CASE WHEN payment='free' THEN 1 ELSE 0 END) as free,
-            SUM(CASE WHEN (payment='' OR payment='unpaid') AND arrival_time!='absent' THEN 1 ELSE 0 END) as unpaid,
+            SUM(CASE WHEN (payment='' OR payment='unpaid') AND arrival_time NOT LIKE 'absent|%' THEN 1 ELSE 0 END) as unpaid,
             SUM(CASE WHEN payment='paid' THEN
               CASE
                 WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m2.early_bird_fee,0), 388)

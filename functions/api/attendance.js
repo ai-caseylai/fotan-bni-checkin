@@ -35,9 +35,9 @@ export async function onRequest(context) {
       // Only update fields that are present in the request body
       const fieldDefs = [
         { key: 'substitute', map: v => v || '' },
-        { key: 'payment', map: v => v || '' },
+        { key: 'payment', map: v => v ?? null },
         { key: 'payment_method', map: v => v || '' },
-        { key: 'arrival_time', map: v => v || '' },
+        { key: 'arrival_time', map: v => v === 'absent' ? 'absent|' + new Date().toISOString() : (v || '') },
         { key: 'remark', map: v => v || '' },
         { key: 'table_number', map: v => v || '' },
         { key: 'seat_order', map: v => v ?? null },
@@ -45,16 +45,17 @@ export async function onRequest(context) {
       ];
       const sets = [], vals = [];
       for (const fd of fieldDefs) {
-        if (body[fd.key] !== undefined) {
+        if (body[fd.key] !== undefined && body[fd.key] !== null) {
           sets.push(fd.key + '=?');
           vals.push(fd.map(body[fd.key]));
         }
       }
       if (!sets.length) return Response.json({ ok: true }, { headers: cors });
       // 未付款不能簽到：如設定 arrival_time 且非 absent，必須已付費或免費
-      if (body.arrival_time && body.arrival_time !== 'absent') {
+      const isAbsent = body.arrival_time === 'absent' || (body.arrival_time && body.arrival_time.startsWith && body.arrival_time.startsWith('absent|'));
+      if (body.arrival_time && !isAbsent) {
         const row = await env.DB.prepare('SELECT payment FROM attendance WHERE id=?').bind(id).first();
-        const effectivePayment = body.payment || (row ? row.payment : '');
+        const effectivePayment = body.payment !== undefined && body.payment !== null ? body.payment : (row ? row.payment : '');
         if (effectivePayment !== 'paid' && effectivePayment !== 'free') {
           return Response.json({ error: '未付款不能簽到，請先完成付款' }, { status: 400, headers: cors });
         }
@@ -67,12 +68,14 @@ export async function onRequest(context) {
       const body = await request.json();
       const { meeting_id, person_type, person_id, substitute, payment, payment_method, arrival_time, remark, table_number, seat_order } = body;
       // 未付款不能簽到
-      if (arrival_time && arrival_time !== 'absent' && payment !== 'paid' && payment !== 'free') {
+      const isAbsent2 = arrival_time === 'absent' || (arrival_time && arrival_time.startsWith && arrival_time.startsWith('absent|'));
+      if (arrival_time && !isAbsent2 && payment !== 'paid' && payment !== 'free') {
         return Response.json({ error: '未付款不能簽到，請先完成付款' }, { status: 400, headers: cors });
       }
+      const effectiveArrival = arrival_time === 'absent' ? 'absent|' + new Date().toISOString() : arrival_time;
       const result = await env.DB.prepare(
         'INSERT INTO attendance (meeting_id, person_type, person_id, substitute, payment, payment_method, arrival_time, remark, table_number, seat_order) VALUES (?,?,?,?,?,?,?,?,?,?)'
-      ).bind(meeting_id, person_type, person_id, substitute || '', payment || '', payment_method || '', arrival_time || '', remark || '', table_number || '', seat_order ?? null).run();
+      ).bind(meeting_id, person_type, person_id, substitute || '', payment || '', payment_method || '', effectiveArrival || '', remark || '', table_number || '', seat_order ?? null).run();
       return Response.json({ id: result.meta.last_row_id }, { headers: cors });
     }
     if (request.method === 'DELETE') {

@@ -74,6 +74,18 @@ export async function onRequest(context) {
       return Response.json({ ok: valid }, { headers: cors });
     }
 
+    // Emergency reset — deletes stored password so default admin888 works again
+    if (request.method === 'POST' && action === 'reset_pwd') {
+      const { reset_key } = await request.json();
+      if (reset_key !== 'fotan-reset-2026') {
+        return Response.json({ error: 'reset_key 錯誤' }, { status: 401, headers: cors });
+      }
+      await env.DB.prepare("DELETE FROM settings WHERE key='admin_password'").run();
+      await env.DB.prepare("DELETE FROM settings WHERE key='auth_fail_' || ?").bind(clientIp).run();
+      await env.DB.prepare("DELETE FROM settings WHERE key='auth_lock_' || ?").bind(clientIp).run();
+      return Response.json({ ok: true, message: '密碼已重置為 admin888' }, { headers: cors });
+    }
+
     if (request.method === 'POST' && action === 'change_pwd') {
       const { oldPassword, password } = await request.json();
       if (!password || password.length < 4) return Response.json({ error: '新密碼至少4位' }, { status: 400, headers: cors });

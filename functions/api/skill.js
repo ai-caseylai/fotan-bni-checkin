@@ -119,8 +119,9 @@ export async function onRequest(context) {
     if (action === 'mark_arrival') {
       const { attendance_id, arrival_time } = body;
       if (!attendance_id) return Response.json({ ok: false, error: 'attendance_id required' }, { headers: cors });
+      const isAbsent = arrival_time === 'absent' || (arrival_time && arrival_time.startsWith && arrival_time.startsWith('absent|'));
       // 未付款不能簽到
-      if (arrival_time && arrival_time !== 'absent') {
+      if (arrival_time && !isAbsent) {
         const row = await env.DB.prepare('SELECT payment, table_number, seat_order, person_type, person_id FROM attendance WHERE id=?').bind(attendance_id).first();
         if (!row || (row.payment !== 'paid' && row.payment !== 'free')) {
           return Response.json({ ok: false, error: '未付款不能簽到，請先完成付款' }, { headers: cors });
@@ -136,10 +137,12 @@ export async function onRequest(context) {
         await env.DB.prepare('UPDATE attendance SET arrival_time=?, table_number=?, seat_order=? WHERE id=?')
           .bind(arrival_time, tbl, seat, attendance_id).run();
       } else {
+        const absentVal = 'absent|' + new Date().toISOString();
         await env.DB.prepare('UPDATE attendance SET arrival_time=? WHERE id=?')
-          .bind(arrival_time || 'absent', attendance_id).run();
+          .bind(absentVal, attendance_id).run();
+        return Response.json({ ok: true, message: `已標記 attendance #${attendance_id} 為 缺席` }, { headers: cors });
       }
-      return Response.json({ ok: true, message: `已標記 attendance #${attendance_id} 為 ${arrival_time || 'absent'}` }, { headers: cors });
+      return Response.json({ ok: true, message: `已標記 attendance #${attendance_id} 為 ${arrival_time}` }, { headers: cors });
     }
 
     // ── search ──────────────────────────────────────
@@ -172,8 +175,8 @@ export async function onRequest(context) {
           SUM(CASE WHEN a.payment='paid' THEN 1 ELSE 0 END) as paid,
           SUM(CASE WHEN a.payment='free' THEN 1 ELSE 0 END) as free,
           SUM(CASE WHEN a.payment='unpaid' THEN 1 ELSE 0 END) as unpaid,
-          SUM(CASE WHEN a.arrival_time IS NOT NULL AND a.arrival_time!='' AND a.arrival_time!='absent' THEN 1 ELSE 0 END) as arrived,
-          SUM(CASE WHEN a.arrival_time='absent' THEN 1 ELSE 0 END) as absent,
+          SUM(CASE WHEN a.arrival_time IS NOT NULL AND a.arrival_time!='' AND a.arrival_time NOT LIKE 'absent|%' THEN 1 ELSE 0 END) as arrived,
+          SUM(CASE WHEN a.arrival_time LIKE 'absent|%' THEN 1 ELSE 0 END) as absent,
           SUM(CASE WHEN a.payment='paid' THEN
             CASE
               WHEN a.price_tier='early_bird' THEN COALESCE(NULLIF(m.early_bird_fee,0), 388)
@@ -317,7 +320,7 @@ export async function onRequest(context) {
     // ── export_stats ────────────────────────────────
     if (action === 'export_stats') {
       const meetings = await env.DB.prepare(
-        'SELECT m.*, COUNT(a.id) as total, SUM(CASE WHEN a.person_type=\'member\' THEN 1 ELSE 0 END) as members, SUM(CASE WHEN a.person_type=\'guest\' THEN 1 ELSE 0 END) as guests, SUM(CASE WHEN a.payment=\'paid\' THEN 1 ELSE 0 END) as paid, SUM(CASE WHEN a.payment=\'free\' THEN 1 ELSE 0 END) as free, SUM(CASE WHEN a.payment=\'unpaid\' THEN 1 ELSE 0 END) as unpaid, SUM(CASE WHEN a.arrival_time IS NOT NULL AND a.arrival_time!=\'\' AND a.arrival_time!=\'absent\' THEN 1 ELSE 0 END) as arrived, SUM(CASE WHEN a.arrival_time=\'absent\' THEN 1 ELSE 0 END) as absent FROM meetings m LEFT JOIN attendance a ON m.id=a.meeting_id GROUP BY m.id ORDER BY m.date DESC'
+        'SELECT m.*, COUNT(a.id) as total, SUM(CASE WHEN a.person_type=\'member\' THEN 1 ELSE 0 END) as members, SUM(CASE WHEN a.person_type=\'guest\' THEN 1 ELSE 0 END) as guests, SUM(CASE WHEN a.payment=\'paid\' THEN 1 ELSE 0 END) as paid, SUM(CASE WHEN a.payment=\'free\' THEN 1 ELSE 0 END) as free, SUM(CASE WHEN a.payment=\'unpaid\' THEN 1 ELSE 0 END) as unpaid, SUM(CASE WHEN a.arrival_time IS NOT NULL AND a.arrival_time!=\'\' AND a.arrival_time NOT LIKE \'absent|%\' THEN 1 ELSE 0 END) as arrived, SUM(CASE WHEN a.arrival_time LIKE \'absent|%\' THEN 1 ELSE 0 END) as absent FROM meetings m LEFT JOIN attendance a ON m.id=a.meeting_id GROUP BY m.id ORDER BY m.date DESC'
       ).all();
       const memberCount = await env.DB.prepare('SELECT COUNT(*) as c FROM members WHERE active=1').first();
       const guestCount = await env.DB.prepare('SELECT COUNT(*) as c FROM guests WHERE active=1').first();

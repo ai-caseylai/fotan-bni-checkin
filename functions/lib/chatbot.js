@@ -107,10 +107,10 @@ export async function executeFunction(env, name, args) {
         mid = latest.id;
       }
       const meeting = await env.DB.prepare('SELECT * FROM meetings WHERE id=?').bind(mid).first();
-      const checkedIn = await env.DB.prepare("SELECT COUNT(*) as c FROM attendance WHERE meeting_id=? AND arrival_time!='' AND arrival_time!='absent'").bind(mid).first();
+      const checkedIn = await env.DB.prepare("SELECT COUNT(*) as c FROM attendance WHERE meeting_id=? AND arrival_time!='' AND arrival_time NOT LIKE 'absent|%'").bind(mid).first();
       const paid = await env.DB.prepare("SELECT COUNT(*) as c FROM attendance WHERE meeting_id=? AND payment='paid'").bind(mid).first();
-      const unpaid = await env.DB.prepare("SELECT COUNT(*) as c FROM attendance WHERE meeting_id=? AND (payment='' OR payment='unpaid') AND arrival_time!='absent'").bind(mid).first();
-      const absent = await env.DB.prepare("SELECT COUNT(*) as c FROM attendance WHERE meeting_id=? AND arrival_time='absent'").bind(mid).first();
+      const unpaid = await env.DB.prepare("SELECT COUNT(*) as c FROM attendance WHERE meeting_id=? AND (payment='' OR payment='unpaid') AND arrival_time NOT LIKE 'absent|%'").bind(mid).first();
+      const absent = await env.DB.prepare("SELECT COUNT(*) as c FROM attendance WHERE meeting_id=? AND arrival_time LIKE 'absent|%'").bind(mid).first();
       return JSON.stringify({ meeting, checked_in: checkedIn.c, paid_count: paid.c, unpaid_count: unpaid.c, absent_count: absent.c });
     }
     case 'get_industry_list': {
@@ -193,16 +193,18 @@ export async function executeFunction(env, name, args) {
       return JSON.stringify({ ok: true, message: '已更新枱號/座位' });
     }
     case 'mark_arrival': {
+      const isAbsent2 = args.arrival_time === 'absent' || (args.arrival_time && args.arrival_time.startsWith && args.arrival_time.startsWith('absent|'));
       // 未付款不能簽到
-      if (args.arrival_time && args.arrival_time !== 'absent') {
+      if (args.arrival_time && !isAbsent2) {
         const row = await env.DB.prepare('SELECT payment FROM attendance WHERE id=?').bind(args.attendance_id).first();
         if (!row || (row.payment !== 'paid' && row.payment !== 'free')) {
           return JSON.stringify({ ok: false, message: '未付款不能簽到，請先更新付款狀態' });
         }
       }
+      const absentVal2 = 'absent|' + new Date().toISOString();
       await env.DB.prepare('UPDATE attendance SET arrival_time=? WHERE id=?')
-        .bind(args.arrival_time || 'absent', args.attendance_id).run();
-      return JSON.stringify({ ok: true, message: '已標記為 ' + (args.arrival_time || 'absent') });
+        .bind(args.arrival_time && !isAbsent2 ? args.arrival_time : absentVal2, args.attendance_id).run();
+      return JSON.stringify({ ok: true, message: '已標記為 ' + (args.arrival_time && !isAbsent2 ? args.arrival_time : '缺席') });
     }
     case 'get_settings': {
       const rows = await env.DB.prepare('SELECT key, value FROM settings').all();
