@@ -21,6 +21,7 @@ const ROLE_PERMISSIONS = {
 };
 
 function canAccess(page) {
+  if (currentUserRole === 'admin') return true; // admin sees all pages
   const allowed = ROLE_PERMISSIONS[currentUserRole] || ROLE_PERMISSIONS['viewer'];
   return allowed.includes(page);
 }
