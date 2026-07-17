@@ -21,6 +21,7 @@ export function getTools() {
     { type: 'function', function: { name: 'get_receipts', description: '查詢會員付款憑證', parameters: { type: 'object', properties: { member_id: { type: 'integer' } }, required: ['member_id'] } } },
     { type: 'function', function: { name: 'create_member', description: '新增會員', parameters: { type: 'object', properties: { name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string', description: '會員/主席/副主席/秘書長/幹事' } }, required: ['name'] } } },
     { type: 'function', function: { name: 'update_member', description: '更新會員資料（支援 tags、table_number、seat_order、active）', parameters: { type: 'object', properties: { member_id: { type: 'integer' }, name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string', description: '會員/主席/副主席/秘書長/幹事' }, fee_paid_date: { type: 'string' }, bio: { type: 'string' }, tags: { type: 'string', description: '逗號分隔標籤' }, table_number: { type: 'string' }, seat_order: { type: 'integer' }, active: { type: 'integer', description: '0=軟刪除' } }, required: ['member_id'] } } },
+    { type: 'function', function: { name: 'update_guest', description: '更新來賓資料或刪除來賓（設 active=0 即軟刪除）。當用戶要求刪除/移除來賓時，必須先 search_people 搵出來賓 ID，再用此 function 設 active=0', parameters: { type: 'object', properties: { guest_id: { type: 'integer', description: '來賓ID（必須先從 search_people 取得）' }, name: { type: 'string' }, tel: { type: 'string' }, professional: { type: 'string' }, invited_by: { type: 'string' }, vip: { type: 'integer', description: '1=VIP嘉賓' }, active: { type: 'integer', description: '0=軟刪除/移除，1=正常' } }, required: ['guest_id'] } } },
     { type: 'function', function: { name: 'bulk_create_members', description: '批次匯入會員名單（Excel/CSV 匯入）', parameters: { type: 'object', properties: { members: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, tel: { type: 'string' }, email: { type: 'string' }, professional: { type: 'string' }, role: { type: 'string' }, fee_paid_date: { type: 'string' } }, required: ['name'] } } }, required: ['members'] } } },
     { type: 'function', function: { name: 'upload_image', description: '上傳圖片到系統（QR Code、設定圖片等）', parameters: { type: 'object', properties: { name: { type: 'string', description: 'R2 檔名，如 qr-alipay' }, data: { type: 'string', description: 'Base64 圖片數據' }, content_type: { type: 'string', description: 'image/png 或 image/jpeg' } }, required: ['name', 'data'] } } },
     { type: 'function', function: { name: 'auto_seat', description: '自動排位：將指定群組的人全部放喺同一張枱（如一張枱唔夠會自動分多張枱）。適用指令如「把所有委員放同一枱」「將VIP放同一張枱」「把所有姓陳的放在同一枱」「把會員放埋一齊」「將素食嘅人放一齊」。', parameters: { type: 'object', properties: { group: { type: 'string', description: 'committee（委員）/ vip（嘉賓）/ member（會員）/ guest（來賓）/ surname（同姓）/ tag（會員標籤）' }, surname: { type: 'string', description: '姓氏，group=surname 時必填，例如 蘇/陳/李' }, tag: { type: 'string', description: '標籤名，group=tag 時必填，例如 素食、長老、需要翻譯' }, table_number: { type: 'string', description: '指定枱號（可選），由呢張枱開始排，唔夠位會自動開新枱' }, max_per_table: { type: 'integer', description: '每枱人數上限，預設12人' } }, required: ['group'] } } },
@@ -33,12 +34,15 @@ export function getTools() {
     { type: 'function', function: { name: 'list_all_members', description: '列出所有活躍會員', parameters: { type: 'object', properties: {}, required: [] } } },
     { type: 'function', function: { name: 'list_all_guests', description: '列出所有活躍來賓', parameters: { type: 'object', properties: {}, required: [] } } },
     { type: 'function', function: { name: 'update_settings', description: '更新系統設定', parameters: { type: 'object', properties: { settings: { type: 'object', description: 'key-value 設定對照表' } }, required: ['settings'] } } },
-    { type: 'function', function: { name: 'delete_meeting', description: '刪除會議及其所有出席記錄', parameters: { type: 'object', properties: { meeting_id: { type: 'integer' } }, required: ['meeting_id'] } } }
+    { type: 'function', function: { name: 'delete_meeting', description: '刪除會議及其所有出席記錄', parameters: { type: 'object', properties: { meeting_id: { type: 'integer' } }, required: ['meeting_id'] } } },
+    { type: 'function', function: { name: 'generate_receipt', description: '收到付款資料後生成正式PDF收據並查詢付款人身份。當用戶提供姓名/電話/金額/日期等付款資訊，或說「出收據/開收據/整收據/paid/付款/generate receipt」時，必須使用此工具。一併處理：生成PDF+查詢資料庫匹配。', parameters: { type: 'object', properties: { name: { type: 'string', description: '付款人姓名' }, amount: { type: 'integer', description: '付款金額(HK$)' }, phone: { type: 'string', description: '電話號碼（可選）' }, date: { type: 'string', description: '日期（可選）例如 2026年7月15日' }, text: { type: 'string', description: '用戶原始輸入的全部文字' } }, required: [] } } }
   ];
 }
 
 export function getSystemPrompt() {
   return `你是火炭會聚會助理「龍蝦仔」🦞。用港式地道廣東話回覆，語氣親切風趣，似朋友WhatsApp傾計咁。每句1-2句，唔好太長。唔好用Markdown。
+
+⚠️ 搜尋規則：當用戶要求搜尋、查詢、搵人、睇會員/來賓時，你必須調用 search_people function！唔准用「我幫你搵緊」敷衍！調用完後根據回傳結果列出名單。其他操作同樣：必須調用對應 function，唔准跳過！
 
 格式規則：每筆資料之間用空行分隔（即兩個換行）。名單用「名｜專業｜電話」格式。一定要有分行！唔准全部黐埋一齊！
 
@@ -241,6 +245,18 @@ export async function executeFunction(env, name, args) {
       values.push(args.member_id);
       await env.DB.prepare('UPDATE members SET '+fields.join(',')+' WHERE id=?').bind(...values).run();
       return JSON.stringify({ ok: true, message: '已更新會員 #' + args.member_id });
+    }
+    case 'update_guest': {
+      const fields = [];
+      const values = [];
+      for (const f of ['name','tel','professional','invited_by','vip','active']) {
+        if (args[f] !== undefined) { fields.push(f+'=?'); values.push(args[f]); }
+      }
+      if (!fields.length) return JSON.stringify({ error: '請提供要更新的欄位' });
+      values.push(args.guest_id);
+      await env.DB.prepare('UPDATE guests SET '+fields.join(',')+' WHERE id=?').bind(...values).run();
+      const action = args.active === 0 || args.active === '0' ? '已刪除來賓' : '已更新來賓';
+      return JSON.stringify({ ok: true, message: action + ' #' + args.guest_id });
     }
     case 'bulk_create_members': {
       const memberList = args.members || [];
@@ -561,6 +577,139 @@ export async function executeFunction(env, name, args) {
       await env.DB.prepare('DELETE FROM meetings WHERE id=?').bind(args.meeting_id).run();
       return JSON.stringify({ ok: true, message: '已刪除會議 #' + args.meeting_id });
     }
+    case 'generate_receipt': {
+      let { name, amount, phone, date, text } = args;
+      // Parse from natural language text if fields not explicitly provided
+      if (text && (!name || !amount)) {
+        // Pattern 1: "Name paid amount" or "Name 已付 amount"
+        let m = text.match(/(.+?)\s*(?:paid|已付|付款)\s*\$?(\d+)/i);
+        // Pattern 2: "Name phone date amount元" (Cantonese style)
+        if (!m) m = text.match(/(\S+)\s+(\d{8})\s+(\d{1,2}月\d{1,2})\s+(\d+)\s*元?/);
+        // Pattern 3: any name followed by a dollar amount
+        if (!m) m = text.match(/(.+?)\s+(\d+)\s*元?\s*$/);
+        if (m) {
+          name = name || m[1].trim();
+          if (!amount && m.length > 2) amount = parseInt(m[m.length-1].match(/\d+/)?.[0] || m[2]);
+          if (!phone && text.match(/(\d{8})/)) phone = RegExp.$1;
+        }
+      }
+      if (!name) return JSON.stringify({ error: '請提供付款人姓名，例如：陳大文 paid 398 或 陳大文 91234567 7月15 280元' });
+      if (!amount || isNaN(amount)) return JSON.stringify({ error: '請提供有效付款金額' });
+
+      try {
+        // Generate receipt directly using the same logic as skill.js (no external HTTP call)
+        const r2Key = await generateReceiptDirect(env, name, amount, phone || '', date || '');
+        if (!r2Key) return JSON.stringify({ error: '收據PDF生成失敗' });
+
+        const downloadUrl = '/api/image?name=' + encodeURIComponent(r2Key) + '&download=1';
+        const receiptNum = r2Key.match(/receipt-(\d+)/)?.[1] || '';
+
+        // Also auto-lookup the person for the admin
+        let lookupInfo = '';
+        try {
+          const lr = JSON.parse(await executeFunction(env, 'lookup_payer', { search_name: name, search_tel: phone || '', amount }));
+          if (lr.ok && lr.found && lr.people?.length > 0) {
+            const p = lr.people[0];
+            lookupInfo = '\n📋 資料庫匹配：' + p.name + ' | ' + p.tel + ' | ' + p.person_type + ' | ' + (p.payment_status==='paid'?'✅已付':p.payment_status==='free'?'🆓免費':'❌未付');
+          }
+        } catch(e) {}
+
+        return JSON.stringify({
+          ok: true,
+          receipt_number: receiptNum,
+          name, amount, phone: phone || '', date: date || '',
+          download_url: downloadUrl,
+          message: '🧾 收據已生成！#' + receiptNum + ' — ' + name + ' HK$' + amount + lookupInfo + '\n📥 ' + downloadUrl
+        });
+      } catch (e) {
+        return JSON.stringify({ error: '收據生成失敗：' + e.message });
+      }
+    }
+    case 'lookup_payer': {
+      const { search_name, search_tel, amount } = args;
+      let results = [];
+      // Search members by name or phone
+      if (search_name || search_tel) {
+        let memberSql = 'SELECT id, name, tel, professional, role, \'member\' as person_type FROM members WHERE active=1';
+        const params = [];
+        if (search_name) {
+          memberSql += ' AND (name LIKE ? OR name LIKE ?)';
+          params.push('%' + search_name + '%', '%' + search_name.replace(/\s/g, '') + '%');
+        }
+        if (search_tel) {
+          const cleanTel = search_tel.replace(/[^0-9]/g, '');
+          if (cleanTel.length >= 4) {
+            memberSql += ' AND REPLACE(REPLACE(tel,\' \',\'\'),\'-\',\'\') LIKE ?';
+            params.push('%' + cleanTel + '%');
+          }
+        }
+        memberSql += ' LIMIT 10';
+        const memberRows = await env.DB.prepare(memberSql).bind(...params).all();
+        results.push(...memberRows.results.map(r => ({ ...r, person_type: 'member' })));
+
+        // Search guests by name or phone
+        let guestSql = 'SELECT id, name, tel, professional, \'guest\' as person_type FROM guests WHERE active=1';
+        const gParams = [];
+        if (search_name) {
+          guestSql += ' AND (name LIKE ? OR name LIKE ?)';
+          gParams.push('%' + search_name + '%', '%' + search_name.replace(/\s/g, '') + '%');
+        }
+        if (search_tel) {
+          const cleanTel = search_tel.replace(/[^0-9]/g, '');
+          if (cleanTel.length >= 4) {
+            guestSql += ' AND REPLACE(REPLACE(tel,\' \',\'\'),\'-\',\'\') LIKE ?';
+            gParams.push('%' + cleanTel + '%');
+          }
+        }
+        guestSql += ' LIMIT 10';
+        const guestRows = await env.DB.prepare(guestSql).bind(...gParams).all();
+        results.push(...guestRows.results.map(r => ({ ...r, person_type: 'guest' })));
+      }
+
+      if (results.length === 0) {
+        return JSON.stringify({
+          ok: true,
+          found: false,
+          message: '找不到匹配的付款人。搜尋：' + (search_name || '') + ' ' + (search_tel || '') + '。請確認姓名或電話號碼是否正確，或手動在後台搜尋。',
+          search_name, search_tel, amount
+        });
+      }
+
+      // Get attendance info for found people
+      const latestMeeting = await env.DB.prepare('SELECT id, date FROM meetings ORDER BY date DESC LIMIT 1').first();
+      for (const p of results) {
+        if (latestMeeting) {
+          const att = await env.DB.prepare(
+            'SELECT id, payment, payment_method, arrival_time, table_number FROM attendance WHERE meeting_id=? AND person_type=? AND person_id=?'
+          ).bind(latestMeeting.id, p.person_type, p.id).first();
+          p.attendance = att || null;
+          p.meeting_date = latestMeeting.date;
+        }
+      }
+
+      return JSON.stringify({
+        ok: true,
+        found: true,
+        count: results.length,
+        amount,
+        search_name,
+        search_tel,
+        people: results.slice(0, 8).map(p => ({
+          name: p.name,
+          name_en: p.name, // Chinese name is the primary; English would be in professional or separate field
+          tel: p.tel || '',
+          professional: p.professional || '',
+          person_type: p.person_type === 'member' ? '會員' : '來賓',
+          role: p.role || '',
+          payment_status: p.attendance?.payment || 'unknown',
+          payment_method: p.attendance?.payment_method || '',
+          arrival_time: p.attendance?.arrival_time || '',
+          table_number: p.attendance?.table_number || '',
+          meeting_date: p.meeting_date || ''
+        })),
+        message: '找到 ' + results.length + ' 位匹配的人員' + (amount ? '，金額 HK$' + amount : '')
+      });
+    }
     case 'update_settings': {
       if (!args.settings || typeof args.settings !== 'object') return JSON.stringify({ error: '請提供 settings object' });
       const stmts = [];
@@ -578,13 +727,103 @@ export async function executeFunction(env, name, args) {
   }
 }
 
+// Auto-generate receipt from extracted payment data
+async function generateReceiptDirect(env, name, amount, phone, date) {
+  try {
+    let counterRow = await env.DB.prepare("SELECT value FROM settings WHERE key='receipt_counter'").first();
+    let counter = counterRow ? parseInt(counterRow.value) : 151;
+    if (isNaN(counter) || counter < 151 || counter > 200) counter = 151;
+    const receiptNum = String(counter).padStart(7, '0');
+    const now = new Date();
+    const issueDate = date || now.toISOString().split('T')[0];
+    const genTime = now.toISOString().replace('T', ' ').slice(0, 19);
+    const nextCounter = counter >= 200 ? 151 : counter + 1;
+    await env.DB.prepare(
+      "INSERT INTO settings (key, value) VALUES ('receipt_counter', ?) ON CONFLICT(key) DO UPDATE SET value = ?"
+    ).bind(String(nextCounter), String(nextCounter)).run();
+
+    const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+    const { default: fontkit } = await import('@pdf-lib/fontkit');
+    const { loadChineseFont } = await import('./font-loader.js');
+
+    const PAGE_W=595.28, PAGE_H=841.89, M=50;
+    const BLACK=rgb(0,0,0), GRAY=rgb(0.38,0.38,0.38), LIGHT=rgb(0.55,0.55,0.55);
+    const GREEN=rgb(0.09,0.62,0.29), LINE=rgb(0.85,0.85,0.85);
+    function pt(mm){return mm*2.8346457;}
+    function tw(t,f,s){let w=0;for(const c of String(t))w+=/[一-鿿　-〿＀-￯]/.test(c)?s:s*0.55;return w;}
+    function T(page,t,x,y,f,s,o={}){if(!t)return;const w=tw(t,f,s);let dx=x;if(o.anchor==='center')dx=x-w/2;else if(o.anchor==='right')dx=x-w;page.drawText(String(t),{x:dx,y,font:f,size:s,color:o.color||BLACK});}
+    function H(page,x1,x2,y,th=0.5){page.drawLine({start:{x:x1,y},end:{x:x2,y},thickness:th,color:LINE});}
+
+    const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
+    let chFont=null,helv=null;
+    try{const fd=await loadChineseFont();chFont=await doc.embedFont(fd);}catch(e){}
+    try{helv=await doc.embedFont(StandardFonts.Helvetica);}catch(e){}
+    if(!helv)helv=chFont;
+    const CF=chFont||helv, EN=helv;
+    const hasCN=!!chFont;
+
+    const page=doc.addPage([PAGE_W,PAGE_H]);let y=PAGE_H-M;
+    if(hasCN)T(page,'火炭會',M,y,CF,11,{color:GRAY});
+    T(page,'Fo Tan Chapter',PAGE_W-M,y,EN,8,{color:LIGHT,anchor:'right'});
+    y-=pt(6);H(page,M,PAGE_W-M,y);y-=pt(12);
+    if(hasCN)T(page,'付款收據',PAGE_W/2,y,CF,24,{anchor:'center',color:GREEN});
+    T(page,'PAYMENT RECEIPT',PAGE_W/2,y,EN,14,{anchor:'center',color:GREEN});y-=pt(14);
+    page.drawRectangle({x:PAGE_W-M-120,y:y-30,width:120,height:30,borderColor:LINE,borderWidth:0.5});
+    T(page,hasCN?'收據編號':'Receipt No.',PAGE_W-M-115,y-8,hasCN?CF:EN,7,{color:LIGHT});
+    T(page,receiptNum,PAGE_W-M-10,y-22,EN,14,{anchor:'right'});y-=pt(16);
+    H(page,M,PAGE_W-M,y);y-=pt(14);
+
+    const labelX=M,valueX=M+100,rowH=pt(16);
+    function row(label,cnLabel,value,cy){
+      const lbl=hasCN?cnLabel:label;
+      T(page,lbl,labelX,cy,hasCN?CF:EN,10,{color:GRAY});
+      T(page,value||'—',valueX,cy,hasCN?CF:EN,13,{color:BLACK});
+    }
+    row('Payer','付款人 / Payer',String(name),y);y-=rowH;
+    if(phone){row('Phone','電話 / Phone',String(phone),y);y-=rowH;}
+    row('Date','日期 / Date',issueDate,y);y-=rowH;
+    y-=pt(4);H(page,M,PAGE_W-M,y);y-=pt(10);
+    T(page,hasCN?'金額 / Amount':'Amount',M,y,hasCN?CF:EN,10,{color:GRAY});y-=pt(6);
+    T(page,'HK$ '+String(amount).replace(/\B(?=(\d{3})+(?!\d))/g,','),M,y,hasCN?CF:EN,28,{color:GREEN});y-=pt(16);
+    H(page,M,PAGE_W-M,y);y-=pt(14);
+    T(page,hasCN?'此收據由 火炭會 系統自動生成':'Auto-generated by Fo Tan Chapter',PAGE_W/2,y,hasCN?CF:EN,7,{anchor:'center',color:LIGHT});y-=pt(4);
+    T(page,'Generated: '+genTime,PAGE_W/2,y,EN,6,{anchor:'center',color:LIGHT});y-=pt(4);
+    if(hasCN)T(page,'此為電腦編製收據，無需簽名蓋章',PAGE_W/2,y,CF,7,{anchor:'center',color:LIGHT});
+
+    const pdfBytes=await doc.save();
+    const r2Key='receipts/receipt-'+receiptNum+'.pdf';
+    await env.R2.put(r2Key,pdfBytes,{httpMetadata:{contentType:'application/pdf',cacheControl:'no-cache'}});
+    return r2Key;
+  } catch(e) { console.error('generateReceiptDirect error:',e.message); return null; }
+}
+
 export async function callQwen(env, messages, apiKey) {
+  // Detect if any message contains an image (content is array with image_url)
+  const hasImage = messages.some(m => Array.isArray(m.content) && m.content.some(c => c.type === 'image_url'));
+  const model = hasImage ? 'qwen-vl-plus' : 'qwen-plus';
+
+  const systemMsg = { role: 'system', content: getSystemPrompt() };
+  // For VL model: first extract info from image, then auto-search
+  const vlSystemPrompt = `你是火炭會聚會助理龍蝦仔🦞。用戶發送了一張付款憑證截圖（PayMe/FPS/銀行轉帳）。
+
+請從圖片中提取以下資訊並以JSON格式回覆（只回覆JSON，不要其他文字）：
+{
+  "payer_name": "付款人顯示的名稱（中英文皆可）",
+  "phone": "電話號碼（如有）",
+  "amount": 金額數字,
+  "bank": "付款銀行或平台（如有）",
+  "note": "備註/參考號碼（如有）"
+}
+如果某欄位無法辨識，填null。`;
+  const allMsgs = hasImage
+    ? [{ role: 'system', content: vlSystemPrompt }, ...messages]
+    : [systemMsg, ...messages];
+
   const tools = getTools();
   const payload = {
-    model: 'qwen-plus',
-    messages: [{ role: 'system', content: getSystemPrompt() }, ...messages],
-    tools,
-    tool_choice: 'auto'
+    model,
+    messages: allMsgs,
+    tools: hasImage ? undefined : tools
   };
 
   if (!apiKey) return { reply: 'API key 未設定。' };
@@ -592,10 +831,16 @@ export async function callQwen(env, messages, apiKey) {
   let msgs = [...messages];
   let data, choice;
   let toolsCalled = [];
-  const maxRounds = 2;
+  const maxRounds = hasImage ? 1 : 3;
 
   for (let round = 0; round < maxRounds; round++) {
-    const pl = round === 0 ? payload : { model: 'qwen-plus', messages: msgs };
+    // Always include tools + system prompt in every round so the model
+    // can chain tool calls and properly process results
+    const pl = {
+      model,
+      messages: [{ role: 'system', content: hasImage ? vlSystemPrompt : getSystemPrompt() }, ...msgs],
+      ...(hasImage ? {} : { tools })
+    };
     const resp = await fetch('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
@@ -620,5 +865,67 @@ export async function callQwen(env, messages, apiKey) {
     }
   }
 
-  return { reply: data.choices?.[0]?.message?.content || '抱歉，我無法處理這個請求。', tools_used: toolsCalled };
+  let reply = data.choices?.[0]?.message?.content || '抱歉，我無法處理這個請求。';
+
+  // For VL image extraction: auto-search the database
+  if (hasImage && reply) {
+    try {
+      // Try to parse JSON from VL response
+      let extracted = null;
+      const jsonMatch = reply.match(/\{[\s\S]*"payer_name"[\s\S]*\}/);
+      if (jsonMatch) {
+        extracted = JSON.parse(jsonMatch[0]);
+      } else {
+        // Fallback: try parsing any JSON
+        const anyJson = reply.match(/\{[\s\S]*\}/);
+        if (anyJson) extracted = JSON.parse(anyJson[0]);
+      }
+
+      if (extracted && (extracted.payer_name || extracted.phone)) {
+        const searchResult = JSON.parse(await executeFunction(env, 'lookup_payer', {
+          search_name: extracted.payer_name || '',
+          search_tel: extracted.phone || '',
+          amount: extracted.amount || null
+        }));
+        const sr = JSON.parse(searchResult);
+        if (sr.ok && sr.found) {
+          let summary = '📸 憑證分析結果：\n';
+          if (extracted.payer_name) summary += '🏷️ 付款人: ' + extracted.payer_name + '\n';
+          if (extracted.phone) summary += '📱 電話: ' + extracted.phone + '\n';
+          if (extracted.amount) summary += '💰 金額: HK$' + extracted.amount + '\n';
+          if (extracted.bank) summary += '🏦 平台: ' + extracted.bank + '\n';
+          if (extracted.note) summary += '📝 備註: ' + extracted.note + '\n';
+          summary += '\n📋 資料庫匹配結果 (' + sr.count + '人)：\n';
+          sr.people.forEach((p, i) => {
+            summary += (i+1) + '. ' + p.name + ' | ' + p.tel + ' | ' + p.person_type;
+            if (p.professional) summary += ' | ' + p.professional;
+            summary += ' | ' + (p.payment_status === 'paid' ? '✅已付' : p.payment_status === 'free' ? '🆓免費' : '❌未付');
+            if (p.table_number) summary += ' | 🍽' + p.table_number;
+            summary += '\n';
+          });
+          if (sr.people.length === 0) summary += '⚠️ 找不到匹配記錄，請手動確認\n';
+
+          // Auto-generate receipt if we have a name and amount
+          if (sr.people.length > 0 && extracted.amount) {
+            try {
+              const payerName = sr.people[0].name;
+              const rKey = await generateReceiptDirect(env, payerName, extracted.amount, extracted.phone || '', extracted.date || '');
+              const receiptUrl = rKey ? '/api/image?name=' + encodeURIComponent(rKey) + '&download=1' : null;
+              if (receiptUrl) {
+                summary += '\n🧾 收據已自動生成！\n📥 ' + receiptUrl;
+              }
+            } catch (e) { /* receipt generation failed, continue without it */ }
+          }
+
+          reply = summary;
+        } else {
+          reply = '📸 已從憑證提取：\n🏷️ ' + (extracted.payer_name || '?') + '\n💰 HK$' + (extracted.amount || '?') + '\n\n⚠️ 但在資料庫中找不到匹配的人員。請手動確認。';
+        }
+      }
+    } catch (e) {
+      // Extraction failed, return VL reply as-is
+    }
+  }
+
+  return { reply, tools_used: toolsCalled };
 }

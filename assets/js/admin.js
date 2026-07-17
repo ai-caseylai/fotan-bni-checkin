@@ -4,17 +4,21 @@ let currentPage = 'overview';
 let members = [], guests = [], meetings = [];
 let currentMeeting = null;
 let meetingAttendance = [];
-let searchText = '';
+let searchTexts = { member: '', guest: '' };
+function getSearchText(type) { return searchTexts[type] || ''; }
+function setSearchText(type, val) { searchTexts[type] = val; }
 let ciViewMode = 'card';
 let mgmtViewMode = 'card';
 let ciPollTimer = null;
 let ciLastHash = '';
 
 async function doLogin() {
+  const user = document.getElementById('login-user')?.value?.trim() || '';
   const pwd = document.getElementById('login-pwd').value;
   const err = document.getElementById('login-err');
   try {
-    const res = await fetch(API + '/auth?action=login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd }) });
+    const body = user ? { username: user, password: pwd } : { password: pwd };
+    const res = await fetch(API + '/auth?action=login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await res.json();
     if (data.ok) {
       document.getElementById('login-overlay').style.display = 'none';
@@ -78,7 +82,7 @@ function switchPage(page) {
   document.querySelectorAll('.sb-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.getElementById('topbar-title').textContent = {
     overview: '總覽', meetings: '會議管理', members: '會員管理',
-    guests: '來賓管理', seating: '餐桌排位', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練', wacert: '入錢憑證', skill: '火炭會 Skill'
+    guests: '來賓管理', users: '用戶管理', seating: '餐桌排位', checkin: '簽到操作', settings: '系統設定', qatraining: 'Q&A 訓練', wacert: '入錢憑證', skill: '火炭會 Skill'
   }[page] || '';
   if (page !== 'checkin') { clearInterval(ciPollTimer); ciPollTimer = null; }
   loadPage(page).catch(function(e) {
@@ -98,6 +102,7 @@ async function loadPage(page) {
     case 'settings': await renderSettingsPage(pc); break;
     case 'qatraining': await renderQATraining(pc); break;
     case 'docs': renderDocsPage(pc); break;
+    case 'users': await renderUsersPage(pc); break;
     case 'wacert': await renderWaCertPage(pc); break;
     case 'skill': await renderSkillPage(pc); break;
   }
@@ -972,6 +977,10 @@ async function showOverviewPayOps(type, pid, attId, name, paid) {
     paySection += '<div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:12px;margin-bottom:8px"><div style="font-weight:700;font-size:13px;color:#f59e0b;margin-bottom:8px">💵 現金付款</div>';
     paySection += '<button class="btn btn-sm" style="width:100%;background:#f59e0b;color:#fff" onclick="markPaymentType('+attId+',\'paid\')">標記現金已付</button></div>';
   }
+  // Payment link section (always shown)
+  paySection += '<div style="background:#f5f3ff;border:1.5px solid #a78bfa;border-radius:10px;padding:12px;margin-bottom:8px"><div style="font-weight:700;font-size:13px;color:#7c3aed;margin-bottom:8px">🔗 個人付款連結</div>';
+  paySection += '<button class="btn btn-sm" style="width:100%;background:#7c3aed;color:#fff" onclick="copyPayLink('+attId+')">📋 複製付款連結</button>';
+  paySection += '<div style="font-size:10px;color:#94a3b8;margin-top:4px;text-align:center">分享此連結給出席者，可識別其付款</div></div>';
   showModal('👤 '+esc(name)+' · '+typeLabel, `
     ${paySection}
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
@@ -1010,6 +1019,32 @@ async function markOverviewPaid(attId) {
   await api('/attendance', {method:'PUT',body:JSON.stringify({id:attId,payment:'paid'})});
   toast('已標記付款');
   hideModal();
+}
+
+// ── Quick pay & payment link helpers ─────────────
+async function quickMarkPaid(attId) {
+  try {
+    await api('/attendance', {method:'PUT',body:JSON.stringify({id:attId,payment:'paid'})});
+    toast('已標記付款 ✅');
+    var openRow = document.querySelector('.detail-row.show');
+    if (openRow) {
+      var mid = parseInt(openRow.id.replace('att-',''));
+      if (mid) { await toggleMeetingRow(mid); }
+    }
+  } catch(e) { toast('標記失敗：'+e.message); }
+}
+
+function copyPayLink(attId) {
+  var url = window.location.origin + '/api/pay?id=' + attId;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function(){ toast('🔗 付款連結已複製'); });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = url; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('🔗 付款連結已複製');
+  }
 }
 
 async function showPersonReceipts(type, pid, name) {
@@ -1145,17 +1180,23 @@ var pname = getName(ptype, a.person_id);
       var unpaid = !a.payment || a.payment === 'unpaid' || a.payment === '';
       var payCls = absent ? 'absent' : (a.payment==='free'?'free':(a.payment==='paid'?'paid':'unpaid'));
       var onclick = '';
+      var actions = '';
       if (unpaid && !absent) {
         var personList = ptype==='member' ? allMembers : allGuests;
         var person = personList.find(function(p){return p.id == a.person_id;});
         var personTel = person ? (person.tel||'') : '';
-        onclick = ' onclick="event.stopPropagation();showSingleWaReminder(\''+esc(pname)+'\',\''+esc(personTel)+'\')" style="cursor:pointer;border-left:3px solid #f59e0b"';
+        onclick = ' onclick="event.stopPropagation();showSingleWaReminder(\''+esc(pname)+'\',\''+esc(personTel)+'\','+a.id+')" style="cursor:pointer;border-left:3px solid #f59e0b"';
+        actions = '<span style="display:inline-flex;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">'+
+          '<button onclick="quickMarkPaid('+a.id+')" style="background:#10b981;color:#fff;border:none;border-radius:6px;padding:2px 7px;font-size:10px;cursor:pointer;line-height:1.5" title="標記已付款">✅ 已付</button>'+
+          '<button onclick="copyPayLink('+a.id+')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:2px 7px;font-size:10px;cursor:pointer;line-height:1.5" title="複製付款連結">🔗</button>'+
+          '</span>';
       }
       return '<div class="att-mini att-'+payCls+'"'+onclick+'>'+
         '<span style="flex:1;font-weight:500">'+esc(pname)+'</span>'+
         (a.substitute ? '<span style="font-size:11px;color:var(--text2)">代:'+esc(a.substitute)+'</span>' : '')+
         '<span style="color:'+(absent?'#94a3b8':'var(--primary)')+';font-weight:500;min-width:50px;text-align:center">'+(absent?'缺席':a.arrival_time||'—')+'</span>'+
         '<span class="badge '+payClass(a.payment)+'">'+payLabel(a.payment)+'</span>'+
+        actions+
         '<span style="font-size:10px;color:var(--text2);min-width:30px;text-align:right">'+(a.table_number?'🍽'+esc(a.table_number):'')+'</span>'+
       '</div>';
     }).join('');
@@ -1284,7 +1325,7 @@ async function renderTablePage(pc, type, title) {
         </div>
       </div>
       ${meetingFilterHtml}
-      <div class="search-wrap"><input type="text" id="tbl-search" placeholder="搜尋..." oninput="doSearch('${type}', this.value)"></div>
+      <div class="search-wrap"><input type="text" id="tbl-search" placeholder="搜尋..." value="${esc(getSearchText(type))}" oninput="doSearch('${type}', this.value)"></div>
       <div class="panel-body">
         <div id="tbl-body"></div>
       </div>
@@ -1299,13 +1340,13 @@ async function filterByMeeting(type) {
   const att = await api('/attendance?meeting_id='+mid);
   const attIds = new Set(att.filter(a => a.person_type === type).map(a => a.person_id));
   let filtered = list.filter(p => attIds.has(p.id));
-  if (searchText) filtered = filtered.filter(p => JSON.stringify(p).toLowerCase().includes(searchText.toLowerCase()));
+  if (getSearchText(type)) filtered = filtered.filter(p => JSON.stringify(p).toLowerCase().includes(getSearchText(type).toLowerCase()));
   renderTableBody(type, filtered);
 }
 
 async function renderTableBody(type, list) {
   const el = document.getElementById('tbl-body');
-  const filtered = searchText ? list.filter(p => JSON.stringify(p).toLowerCase().includes(searchText.toLowerCase())) : list;
+  const filtered = getSearchText(type) ? list.filter(p => JSON.stringify(p).toLowerCase().includes(getSearchText(type).toLowerCase())) : list;
   const showExpand = type === 'guest' || type === 'member';
 
   // Load payment map for guest table view
@@ -1408,7 +1449,7 @@ async function renderTableBody(type, list) {
 }
 
 function doSearch(type, val) {
-  searchText = val;
+  setSearchText(type, val);
   const meetingFilter = document.getElementById('meeting-filter');
   if (meetingFilter && meetingFilter.value) {
     filterByMeeting(type);
@@ -2169,6 +2210,58 @@ async function saveSettings() {
   toast('系統設定已儲存！');
 }
 
+// ── User Management ────────────────────────────────
+async function renderUsersPage(pc) {
+  try {
+    const data = await api('/auth?action=list_users');
+    if (!data.ok) { pc.innerHTML = '<div class="empty">權限不足</div>'; return; }
+    const users = data.users || [];
+    pc.innerHTML = '<div class="panel"><div class="panel-header"><h2>用戶管理 ('+users.length+')</h2></div>' +
+      '<div class="panel-body"><table class="data-table"><thead><tr><th>用戶名</th><th>角色</th><th>狀態</th><th>註冊時間</th><th></th></tr></thead><tbody>' +
+      users.map(function(u){
+        var roleLabel = u.role === 'manager' ? '🏅 Manager' : '👤 Staff';
+        var statusLabel, statusCls;
+        if (u.status === 'approved') { statusLabel = '✅ 已批核'; statusCls = 'badge-paid'; }
+        else if (u.status === 'rejected') { statusLabel = '❌ 已拒絕'; statusCls = 'badge-unpaid'; }
+        else { statusLabel = '⏳ 待批核'; statusCls = 'badge-free'; }
+        var actions = '';
+        if (u.status === 'pending') {
+          actions = '<button class="btn btn-sm" style="background:#10b981;color:#fff" onclick="setUserStatus(\''+esc(u.username)+'\',\'approve\')">✅ 批核</button> '+
+                    '<button class="btn btn-sm btn-danger" onclick="setUserStatus(\''+esc(u.username)+'\',\'reject\')">❌ 拒絕</button>';
+        } else if (u.status === 'rejected') {
+          actions = '<button class="btn btn-sm" style="background:#10b981;color:#fff" onclick="setUserStatus(\''+esc(u.username)+'\',\'approve\')">✅ 重新批核</button>';
+        } else {
+          actions = '<button class="btn btn-sm btn-danger" onclick="setUserStatus(\''+esc(u.username)+'\',\'reject\')">❌ 拒絕</button>';
+        }
+        return '<tr><td><strong>'+esc(u.username)+'</strong></td><td>'+roleLabel+'</td><td><span class="badge '+statusCls+'">'+statusLabel+'</span></td><td>'+esc(u.created_at||'')+'</td><td class="btns">'+actions+'</td></tr>';
+      }).join('') +
+      '</tbody></table>' +
+      (users.length === 0 ? '<div class="empty">暫無用戶</div>' : '') +
+      '</div></div>';
+  } catch(e) {
+    pc.innerHTML = '<div class="empty">載入失敗：'+esc(e.message)+'</div>';
+  }
+}
+
+async function setUserStatus(username, action) {
+  var msg = action === 'approve' ? '確定批核用戶 ' + username + '？' : '確定拒絕用戶 ' + username + '？';
+  if (!confirm(msg)) return;
+  try {
+    var data = await api('/auth?action=' + (action === 'approve' ? 'approve_user' : 'reject_user'), {
+      method: 'POST',
+      body: JSON.stringify({ username: username })
+    });
+    if (data.ok) {
+      toast(data.message);
+      renderUsersPage(document.getElementById('page-content'));
+    } else {
+      toast(data.error || '操作失敗');
+    }
+  } catch(e) {
+    toast('連線失敗');
+  }
+}
+
 // ── Helpers ───────────────────────────────────────
 async function loadAllData() {
   const [m, g] = await Promise.all([api('/members'), api('/guests')]);
@@ -2377,6 +2470,51 @@ function toggleChatPanel() {
   }
 }
 
+// ── Chat image attachment support ─────────────
+var pendingChatImage = null; // { data: base64, type: mime, name: filename }
+
+function handleChatFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var fname = file.name.toLowerCase();
+  var isImg = file.type.startsWith('image/');
+  var isExcel = file.type.includes('spreadsheet') || file.type.includes('excel') || fname.endsWith('.xls') || fname.endsWith('.xlsx') || fname.endsWith('.csv');
+
+  // For Excel, keep existing upload-and-import flow
+  if (isExcel) {
+    uploadChatFile(input);
+    return;
+  }
+
+  // For images, hold in preview for sending with text
+  if (isImg) {
+    var reader = new FileReader();
+    reader.onload = function() {
+      pendingChatImage = { data: reader.result, type: file.type, name: file.name };
+      var preview = document.getElementById('chat-img-preview');
+      preview.style.display = 'block';
+      preview.innerHTML = '<div style="display:flex;align-items:center;gap:8px">'+
+        '<img src="'+reader.result+'" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0">'+
+        '<span style="flex:1;font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🖼️ '+esc(file.name)+'</span>'+
+        '<button onclick="clearChatImage()" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">✕</button>'+
+        '</div>';
+      document.getElementById('chat-input').focus();
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+    return;
+  }
+
+  // For PDF and other files, keep existing upload flow
+  uploadChatFile(input);
+}
+
+function clearChatImage() {
+  pendingChatImage = null;
+  document.getElementById('chat-img-preview').style.display = 'none';
+  document.getElementById('chat-img-preview').innerHTML = '';
+}
+
 async function sendChat() {
   const input = document.getElementById('chat-input');
   const msg = input.value.trim();
@@ -2386,10 +2524,20 @@ async function sendChat() {
   appendChatMsg('assistant', '<i>思考中...</i>');
   const session = getActiveSession();
   try {
-    const history = (session.history || []).concat([{role:'user',content:msg}]);
+    // Build user message — support image attachment
+    var userContent = msg;
+    if (pendingChatImage) {
+      userContent = [
+        { type: 'image_url', image_url: { url: pendingChatImage.data } },
+        { type: 'text', text: msg }
+      ];
+    }
+    const history = (session.history || []).concat([{role:'user',content:userContent}]);
     const resp = await fetch('/api/chat', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({messages: history}) });
     const data = await resp.json();
     document.querySelector('#chat-msgs .chat-msg:last-child').remove();
+    // Clear image preview after send
+    if (pendingChatImage) clearChatImage();
     if (data.error) {
       appendChatMsg('system', '錯誤：'+esc(data.error));
       return;
@@ -2485,13 +2633,18 @@ async function uploadOpsReceipt(memberId) {
   toast('憑證已上傳');
 }
 
-async function showSingleWaReminder(name, tel) {
+async function showSingleWaReminder(name, tel, attId) {
   if (!currentMeeting) return;
   const cleanTel = (tel || '').replace(/[^0-9]/g, '');
   const settings = await api('/settings');
   const template = (settings.waReminderMsg || '您好 {name}，火炭會聚會溫馨提醒：您已出席 {date} 的聚會但尚未付款 (HK${fee})。請盡快安排，謝謝！🙏');
   const fee = currentMeeting.guest_fee || currentMeeting.member_fee || 388;
-  const msg = template.replace(/\{name\}/g, name).replace(/\{date\}/g, currentMeeting.date).replace(/\{fee\}/g, fee);
+  var msg = template.replace(/\{name\}/g, name).replace(/\{date\}/g, currentMeeting.date).replace(/\{fee\}/g, fee);
+  // Append payment link if attId is available
+  if (attId) {
+    var payUrl = window.location.origin + '/api/pay?id=' + attId;
+    msg += '\n\n📎 付款連結：' + payUrl;
+  }
   const waLink = cleanTel ? 'https://wa.me/852' + cleanTel + '?text=' + encodeURIComponent(msg) : '';
   showModal('💬 WhatsApp 追數 — ' + esc(name),
     '<div style="margin-bottom:12px">' +
@@ -2953,9 +3106,9 @@ async function deleteSkillToken(id) {
 }
 
 function downloadSkill() {
-  var content = '---\nname: fotan-skill\ndescription: 火炭會聚會簽到系統完整 Skill — 查詢、匯入、付款、會議、統計、枱號\n---\n\n# 火炭會 Skill\n\n## Token 驗證\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n所有請求格式：`POST https://fotan.techforliving.net/api/skill` + JSON body，必須帶 `token` 同 `action`。\n\n---\n\n## 🌟 嘉賓名單匯入\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{\n    "token": "YOUR_TOKEN",\n    "action": "import_guests",\n    "guests": [\n      {"name": "陳大文", "professional": "律師", "payment": "paid"},\n      {"name": "李小華", "professional": "會計師", "payment": "unpaid"},\n      {"name": "張三", "professional": "工程師", "payment": "free"}\n    ]\n  }\'\n```\n\n| 欄位 | 說明 |\n|------|------|\n| `name` | 姓名（必填） |\n| `professional` | 專業（可選） |\n| `payment` | `paid` / `unpaid` / `free` |\n| `tel` | 電話（可選） |\n| `invited_by` | 邀請人（可選） |\n\n**規則：** 自動用最新會議、跳過會員/來賓重複、如係會員會更新其 attendance 付款狀態。\n\n---\n\n## 💰 更新付款狀態\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_payment", "attendance_id": 123, "payment": "paid"}\'\n```\n\n`payment` 值：`paid` / `free` / `unpaid`\n\n---\n\n## 🍽️ 更新枱號\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_table", "meeting_id": 10, "person_type": "member", "person_id": 26, "table_number": "5"}\'\n```\n\n---\n\n## ✅ 標記出席\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "mark_arrival", "attendance_id": 123, "arrival_time": "12:30"}\'\n```\n\n`arrival_time` 值：`HH:MM` 或 `absent`（缺席）\n\n---\n\n## 🔍 搜尋\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "search", "q": "陳"}\'\n```\n\n---\n\n## 📊 會議統計\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "meeting_stats"}\'\n```\n\n---\n\n## 💳 付款摘要\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "payment_summary"}\'\n```\n\n---\n\n## 📋 會議列表\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n```\n\n---\n\n## 👥 出席名單\n\n```bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_attendance"}\'\n```\n\n---\n\n## 💬 WhatsApp 入錢憑證
+  var content = `---\nname: fotan-skill\ndescription: 火炭會聚會簽到系統完整 Skill — 查詢、匯入、付款、會議、統計、枱號\n---\n\n# 火炭會 Skill\n\n## Token 驗證\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n\`\`\`\n\n所有請求格式：\`POST https://fotan.techforliving.net/api/skill\` + JSON body，必須帶 \`token\` 同 \`action\`。\n\n---\n\n## 🌟 嘉賓名單匯入\n\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{\n    "token": "YOUR_TOKEN",\n    "action": "import_guests",\n    "guests": [\n      {"name": "陳大文", "professional": "律師", "payment": "paid"},\n      {"name": "李小華", "professional": "會計師", "payment": "unpaid"},\n      {"name": "張三", "professional": "工程師", "payment": "free"}\n    ]\n  }\'\n\`\`\`\n\n| 欄位 | 說明 |\n|------|------|\n| \`name\` | 姓名（必填） |\n| \`professional\` | 專業（可選） |\n| \`payment\` | \`paid\` / \`unpaid\` / \`free\` |\n| \`tel\` | 電話（可選） |\n| \`invited_by\` | 邀請人（可選） |\n\n**規則：** 自動用最新會議、跳過會員/來賓重複、如係會員會更新其 attendance 付款狀態。\n\n---\n\n## 💰 更新付款狀態\n\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_payment", "attendance_id": 123, "payment": "paid"}\'\n\`\`\`\n\n\`payment\` 值：\`paid\` / \`free\` / \`unpaid\`\n\n---\n\n## 🍽️ 更新枱號\n\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "update_table", "meeting_id": 10, "person_type": "member", "person_id": 26, "table_number": "5"}\'\n\`\`\`\n\n---\n\n## ✅ 標記出席\n\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "mark_arrival", "attendance_id": 123, "arrival_time": "12:30"}\'\n\`\`\`\n\n\`arrival_time\` 值：\`HH:MM\` 或 \`absent\`（缺席）\n\n---\n\n## 🔍 搜尋\n\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "search", "q": "陳"}\'\n\`\`\`\n\n---\n\n## 📊 會議統計\n\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "meeting_stats"}\'\n\`\`\`\n\n---\n\n## 💳 付款摘要\n\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "payment_summary"}\'\n\`\`\`\n\n---\n\n## 📋 會議列表\n\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_meetings"}\'\n\`\`\`\n\n---\n\n## 👥 出席名單\n\n\`\`\`bash\ncurl -s -X POST "https://fotan.techforliving.net/api/skill" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"token": "YOUR_TOKEN", "action": "list_attendance"}\'\n\`\`\`\n\n---\n\n## 💬 WhatsApp 入錢憑證
 
-```bash
+\`\`\`bash
 # 上傳純文字
 curl -s -X POST "https://fotan.techforliving.net/api/whatsapp-cert" \\
   -H "Content-Type: application/json" \\
@@ -2968,20 +3121,20 @@ curl -s -X POST "https://fotan.techforliving.net/api/whatsapp-cert" \\
 
 # 查詢未關聯來賓
 curl -s "https://fotan.techforliving.net/api/whatsapp-cert?missing=1"
-```
+\`\`\`
 
 | 欄位 | 說明 |
 |------|------|
-| `token` | 技能 Token（必填） |
-| `from_number` | WhatsApp 號碼（必填） |
-| `data` | Base64 相片（可選，純文字可省略） |
-| `comment` | 相片 caption 備註（可選） |
-| `note` | 額外文字備註（可選） |
-| `person_type` | `member` / `guest`（可選，上傳時可指定） |
-| `person_id` | 人員 ID（可選） |
-| `person_name` | 人員姓名（可選） |
+| \`token\` | 技能 Token（必填） |
+| \`from_number\` | WhatsApp 號碼（必填） |
+| \`data\` | Base64 相片（可選，純文字可省略） |
+| \`comment\` | 相片 caption 備註（可選） |
+| \`note\` | 額外文字備註（可選） |
+| \`person_type\` | \`member\` / \`guest\`（可選，上傳時可指定） |
+| \`person_id\` | 人員 ID（可選） |
+| \`person_name\` | 人員姓名（可選） |
 
----\n\n## 🛠️ 手動 SQL（需要 Wrangler + Node.js）\n\n資料庫：D1 `fotan-db`\n```bash\nnpx wrangler d1 execute fotan-db --remote --command "<SQL>"\n```\n';
+---\n\n## 🛠️ 手動 SQL（需要 Wrangler + Node.js）\n\n資料庫：D1 \`fotan-db\`\n\`\`\`bash\nnpx wrangler d1 execute fotan-db --remote --command "<SQL>"\n\`\`\`\n`;
   var blob = new Blob([content], { type: 'text/markdown' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

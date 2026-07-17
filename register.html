@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>註冊 — 火炭會聚會</title>
+  <style>
+    :root {
+      --pri: #0d9488;
+      --pri-hover: #0f766e;
+      --bg: #f1f5f9;
+      --surface: #fff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text2: #64748b;
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 40px 32px;
+      width: 380px;
+      max-width: 100%;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .card .icon { font-size: 44px; margin-bottom: 8px; }
+    .card h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: var(--text); }
+    .card .sub { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+
+    .field { text-align: left; margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .field input, .field select {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color .15s;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .field input:focus, .field select:focus { border-color: var(--pri); }
+    .field select { cursor: pointer; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 6px; padding: 11px 20px; border-radius: 8px; border: none;
+      font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
+      transition: background .15s;
+    }
+    .btn-primary { background: var(--pri); color: #fff; }
+    .btn-primary:hover { background: var(--pri-hover); }
+    .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+
+    .msg { font-size: 13px; margin-top: 10px; display: none; }
+    .msg.error { color: var(--danger); display: block; }
+    .msg.success { color: var(--success); display: block; }
+
+    .link { font-size: 13px; color: var(--text2); margin-top: 16px; }
+    .link a { color: var(--pri); text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📝</div>
+    <h1>註冊帳戶</h1>
+    <p class="sub">火炭會聚會簽到系統</p>
+
+    <form id="reg-form" onsubmit="doRegister();return false">
+      <div class="field">
+        <label for="reg-user">用戶名</label>
+        <input type="text" id="reg-user" placeholder="最少3個字元" autocomplete="username" minlength="3" required>
+      </div>
+      <div class="field">
+        <label for="reg-pwd">密碼</label>
+        <input type="password" id="reg-pwd" placeholder="最少4個字元" autocomplete="new-password" minlength="4" required>
+      </div>
+      <div class="field">
+        <label for="reg-role">角色</label>
+        <select id="reg-role" required>
+          <option value="">請選擇角色</option>
+          <option value="staff">Staff（職員）</option>
+          <option value="manager">Manager（主管）</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" id="reg-btn">註冊</button>
+    </form>
+    <p id="reg-msg" class="msg"></p>
+    <p class="link">已有帳戶？<a href="/login">前往登入</a></p>
+  </div>
+
+  <script>
+    async function doRegister() {
+      const user = document.getElementById('reg-user').value.trim();
+      const pwd  = document.getElementById('reg-pwd').value;
+      const role = document.getElementById('reg-role').value;
+      const msg  = document.getElementById('reg-msg');
+      const btn  = document.getElementById('reg-btn');
+
+      msg.className = 'msg';
+      msg.textContent = '';
+
+      if (user.length < 3) { msg.className = 'msg error'; msg.textContent = '用戶名至少3個字元'; return; }
+      if (pwd.length < 4)  { msg.className = 'msg error'; msg.textContent = '密碼至少4個字元'; return; }
+      if (!role)           { msg.className = 'msg error'; msg.textContent = '請選擇角色'; return; }
+
+      btn.disabled = true;
+      btn.textContent = '註冊中...';
+
+      try {
+        const res = await fetch('/api/auth?action=register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, password: pwd, role: role })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          msg.className = 'msg success';
+          msg.textContent = '✅ ' + data.message + '！跳轉至登入頁...';
+          setTimeout(function(){ window.location.href = '/login'; }, 1500);
+        } else {
+          msg.className = 'msg error';
+          msg.textContent = data.error || '註冊失敗';
+        }
+      } catch (e) {
+        msg.className = 'msg error';
+        msg.textContent = '連線失敗，請檢查網路';
+      }
+      btn.disabled = false;
+      btn.textContent = '註冊';
+    }
+  </script>
+</body>
+</html>

@@ -158,6 +158,33 @@ async function handleMessage(env, msg) {
   }
 }
 
+// ── Load Telegram conversation history (last 1 hour, max 20 messages) ──
+async function loadTgHistory(env, chatId) {
+  try {
+    const rows = await env.DB.prepare(
+      `SELECT role, content FROM telegram_messages
+       WHERE chat_id = ?
+         AND created_at > datetime('now', '-1 hour')
+       ORDER BY created_at ASC
+       LIMIT 20`
+    ).bind(String(chatId)).all();
+
+    const messages = [];
+    for (const row of rows.results) {
+      const role = row.role === 'bot' ? 'assistant' : 'user';
+      if (messages.length > 0 && messages[messages.length - 1].role === role && role === 'user') {
+        messages[messages.length - 1] = { role, content: row.content };
+      } else if (row.content && !row.content.startsWith('[') && row.content.length > 2) {
+        messages.push({ role, content: row.content });
+      }
+    }
+    return messages;
+  } catch (e) {
+    console.error('loadTgHistory error:', e.message);
+    return [];
+  }
+}
+
 async function handleChat(env, chatId, text, msg) {
   await sendChatAction(chatId, 'typing');
   const apiKey = env.QWEN_API_KEY || '';
@@ -167,7 +194,11 @@ async function handleChat(env, chatId, text, msg) {
     return;
   }
 
-  const result = await callQwen(env, [{ role: 'user', content: text }], apiKey);
+  // Load last 1 hour of history for context
+  const history = await loadTgHistory(env, chatId);
+  const messages = [...history, { role: 'user', content: text }];
+
+  const result = await callQwen(env, messages, apiKey);
   const reply = result.reply || '抱歉，我無法處理這個請求。';
   if (reply.length <= 4000) {
     await sendMessage(chatId, reply);

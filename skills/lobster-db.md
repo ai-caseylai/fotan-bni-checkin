@@ -1,9 +1,9 @@
 ---
 name: fotan-skill
-description: 火炭會聚會簽到系統 v3.15 — 35 Skill Actions + PDF 收據 · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
+description: 火炭會聚會簽到系統 v3.16 — 36 Skill Actions + generate_receipt 快速收據 · PDF 收據 · 枱號+座位+枱名 · 完整 CRUD · AI Agent 就緒
 ---
 
-# 火炭會 Skill v3.15
+# 火炭會 Skill v3.16
 
 ## Token 驗證
 ```bash
@@ -358,7 +358,29 @@ curl -s -X POST "https://fotan.techforliving.net/api/skill" \
 
 ## 🧾 PDF 收據
 
-### receipt_pdf — 生成 PDF 付款收據
+### generate_receipt — 快速生成收據（基於樣本模板）
+```bash
+# 直接指定姓名和金額
+curl -s -X POST "https://fotan.techforliving.net/api/skill" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"TOKEN","action":"generate_receipt","name":"陳大文","amount":398}'
+
+# 自然語言輸入（chatbot 使用）
+curl -s -X POST "https://fotan.techforliving.net/api/skill" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"TOKEN","action":"generate_receipt","text":"陳大文 paid 398"}'
+```
+基於 `火炭會_收據樣本_0000101.pdf` 模板，自動填入：
+- 收據編號（0000151-0000200，自動遞增）
+- 付款人姓名
+- 付款金額（HK$）
+- 發出日期
+
+回傳 JSON 含 `download_url`，點擊即可下載 PDF。收據 PDF 同時儲存在 R2 `receipts/receipt-{編號}.pdf`。
+
+Chatbot 支援：直接輸入「陳大文 paid 398」即可自動生成收據。
+
+### receipt_pdf — 生成 PDF 付款收據（WhatsApp 憑證）
 ```bash
 curl -s -o receipt.pdf "https://fotan.techforliving.net/api/receipt-pdf?cert_id=5"
 ```

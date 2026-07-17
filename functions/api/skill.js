@@ -1,3 +1,7 @@
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+import { loadChineseFont } from '../lib/font-loader.js';
+
 export async function onRequest(context) {
   const { request, env } = context;
   const cors = {
@@ -954,7 +958,147 @@ export async function onRequest(context) {
       }, { headers: cors });
     }
 
-    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, create_meeting, update_meeting, delete_meeting, payment_summary, list_attendance, list_members, list_guests, create_member, update_member, create_guest, update_guest, add_to_meeting, delete_person, delete_attendance, delete_attendance_batch, get_settings, update_settings, export_stats, bulk_create_members, upload_image, list_tables, update_table_names, auto_seat, move_table, payment_audit, link_cert, unlink_cert, list_certs` }, { headers: cors });
+    // ── generate_receipt ─────────────────────────
+    if (action === 'generate_receipt') {
+      let { name, amount, phone, date, text } = body;
+
+      // Parse natural language text input
+      if (!name && text) {
+        const match = text.match(/(.+?)\s*(?:paid|已付|付款)\s*\$?(\d+)/i);
+        if (match) { name = match[1].trim(); amount = parseInt(match[2]); }
+      }
+      if (!name) return Response.json({ ok: false, error: 'name required' }, { headers: cors });
+      if (!amount || isNaN(amount)) return Response.json({ ok: false, error: 'valid amount required' }, { headers: cors });
+
+      // Get receipt counter
+      let counterRow = await env.DB.prepare("SELECT value FROM settings WHERE key='receipt_counter'").first();
+      let counter = counterRow ? parseInt(counterRow.value) : 151;
+      if (isNaN(counter) || counter < 151 || counter > 200) counter = 151;
+
+      const receiptNum = String(counter).padStart(7, '0');
+      const now = new Date();
+      const issueDate = date || now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const genTime = now.toISOString().replace('T', ' ').slice(0, 19); // ISO timestamp
+
+      // Increment and save counter
+      const nextCounter = counter >= 200 ? 151 : counter + 1;
+      await env.DB.prepare(
+        "INSERT INTO settings (key, value) VALUES ('receipt_counter', ?) ON CONFLICT(key) DO UPDATE SET value = ?"
+      ).bind(String(nextCounter), String(nextCounter)).run();
+
+      try {
+        const PAGE_W = 595.28, PAGE_H = 841.89, MARGIN = 50;
+        const BLACK = rgb(0,0,0), GRAY = rgb(0.38,0.38,0.38), LIGHT = rgb(0.55,0.55,0.55);
+        const GREEN = rgb(0.09,0.62,0.29), LINE = rgb(0.85,0.85,0.85);
+
+        function pt(mm) { return mm * 2.8346457; }
+        function tw(t, f, s) { let w=0; for(const c of String(t)) w+= /[一-鿿　-〿＀-￯]/.test(c)?s:s*0.55; return w; }
+        function T(page, t, x, y, f, s, o={}) {
+          if(!t)return; const w=tw(t,f,s); let dx=x;
+          if(o.anchor==='center')dx=x-w/2; else if(o.anchor==='right')dx=x-w;
+          page.drawText(String(t),{x:dx,y,font:f,size:s,color:o.color||BLACK});
+        }
+        function H(page, x1, x2, y, th=0.5) { page.drawLine({start:{x:x1,y},end:{x:x2,y},thickness:th,color:LINE}); }
+
+        const doc = await PDFDocument.create();
+        doc.registerFontkit(fontkit);
+
+        let chFont = null, helvetica = null;
+        try { const fd = await loadChineseFont(); chFont = await doc.embedFont(fd); } catch(e) { console.error('Chinese font failed:', e.message); }
+        try { helvetica = await doc.embedFont(StandardFonts.Helvetica); } catch(e) {}
+        if (!helvetica) helvetica = chFont;
+        const F = chFont || helvetica, FB = helvetica;
+        const hasCN = !!chFont;
+        // Strip CJK if no Chinese font (pdf-lib validates encoding at save time)
+        function s(t) { return hasCN ? String(t) : String(t).replace(/[^\x00-\x7F]/g, '?'); }
+
+        const page = doc.addPage([PAGE_W, PAGE_H]);
+        let y = PAGE_H - MARGIN;
+
+        // ── Header ──
+        if (hasCN) T(page, '火炭會', MARGIN, y, F, 11, { color: GRAY });
+        T(page, 'Fo Tan Chapter', PAGE_W - MARGIN, y, FB, 8, { color: LIGHT, anchor: 'right' });
+        y -= pt(6);
+        H(page, MARGIN, PAGE_W - MARGIN, y);
+        y -= pt(12);
+
+        // ── Title ──
+        if (hasCN) T(page, '付款收據', PAGE_W / 2, y, F, 24, { anchor: 'center', color: GREEN });
+        T(page, 'PAYMENT RECEIPT', PAGE_W / 2, y, FB, 14, { anchor: 'center', color: GREEN });
+        y -= pt(14);
+
+        // ── Receipt number (top right box) ──
+        page.drawRectangle({ x: PAGE_W - MARGIN - 120, y: y - 30, width: 120, height: 30, borderColor: LINE, borderWidth: 0.5 });
+        T(page, hasCN ? '收據編號' : 'Receipt No.', PAGE_W - MARGIN - 115, y - 8, hasCN ? F : FB, 7, { color: LIGHT });
+        T(page, receiptNum, PAGE_W - MARGIN - 10, y - 22, FB, 14, { anchor: 'right' });
+        y -= pt(16);
+
+        H(page, MARGIN, PAGE_W - MARGIN, y);
+        y -= pt(14);
+
+        // ── Info rows ──
+        const labelX = MARGIN, valueX = MARGIN + 100, rowH = pt(16);
+        function row(label, cnLabel, value, cy) {
+          T(page, s(hasCN ? cnLabel : label), labelX, cy, hasCN ? F : FB, 10, { color: GRAY });
+          T(page, s(value || '—'), valueX, cy, F, 13, { color: BLACK });
+        }
+
+        row('Payer', '付款人 / Payer', String(name), y); y -= rowH;
+        if (phone) { row('Phone', '電話 / Phone', String(phone), y); y -= rowH; }
+        row('Date', '日期 / Date', s(issueDate), y); y -= rowH;
+        y -= pt(4);
+        H(page, MARGIN, PAGE_W - MARGIN, y);
+        y -= pt(10);
+
+        // ── Amount (prominent) ──
+        T(page, hasCN ? '金額 / Amount' : 'Amount', MARGIN, y, hasCN ? F : FB, 10, { color: GRAY });
+        y -= pt(6);
+        T(page, 'HK$ ' + String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, ','), MARGIN, y, F, 28, { color: GREEN });
+        y -= pt(16);
+        H(page, MARGIN, PAGE_W - MARGIN, y);
+        y -= pt(14);
+
+        // ── Footer ──
+        if (hasCN) T(page, '此收據由 火炭會 系統自動生成', PAGE_W / 2, y, F, 7, { anchor: 'center', color: LIGHT });
+        else T(page, 'Auto-generated by Fo Tan Chapter', PAGE_W / 2, y, FB, 7, { anchor: 'center', color: LIGHT });
+        y -= pt(4);
+        T(page, 'Generated: ' + genTime, PAGE_W / 2, y, FB, 6, { anchor: 'center', color: LIGHT });
+        y -= pt(4);
+        if (hasCN) T(page, '此為電腦編製收據，無需簽名蓋章', PAGE_W / 2, y, F, 7, { anchor: 'center', color: LIGHT });
+
+        // Helper: draw text safely, falling back to ASCII
+        function safeT(page, t, x, y, f, s, o) {
+          try { T(page, t, x, y, f, s, o); } catch(e) {
+            // If CJK font issues, strip to ASCII
+            const ascii = String(t).replace(/[^\x00-\x7F]/g, '?');
+            try { T(page, ascii, x, y, FB, s, o); } catch(e2) {}
+          }
+        }
+
+        const pdfBytes = await doc.save();
+
+        // Save to R2
+        const r2Key = 'receipts/receipt-' + receiptNum + '.pdf';
+        await env.R2.put(r2Key, pdfBytes, {
+          httpMetadata: { contentType: 'application/pdf', cacheControl: 'no-cache' }
+        });
+
+        const downloadUrl = '/api/image?name=' + encodeURIComponent(r2Key) + '&download=1';
+
+        return Response.json({
+          ok: true,
+          receipt_number: receiptNum,
+          name, amount, phone: phone || '', date: issueDate,
+          download_url: downloadUrl,
+          message: '🧾 收據已生成！#' + receiptNum + ' — ' + name + ' HK$' + amount + '\n📥 下載：' + downloadUrl
+        }, { headers: cors });
+
+      } catch (e) {
+        return Response.json({ ok: false, error: 'PDF generation failed: ' + e.message }, { headers: cors });
+      }
+    }
+
+    return Response.json({ ok: false, error: `unknown action: ${action}. Valid: import_guests, update_payment, update_table, mark_arrival, search, meeting_stats, list_meetings, create_meeting, update_meeting, delete_meeting, payment_summary, list_attendance, list_members, list_guests, create_member, update_member, create_guest, update_guest, add_to_meeting, delete_person, delete_attendance, delete_attendance_batch, get_settings, update_settings, export_stats, bulk_create_members, upload_image, list_tables, update_table_names, auto_seat, move_table, payment_audit, link_cert, unlink_cert, list_certs, generate_receipt` }, { headers: cors });
 
   } catch (e) {
     return Response.json({ ok: false, error: e.message }, { headers: cors });
