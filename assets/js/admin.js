@@ -2283,6 +2283,7 @@ function showModal(title, body) {
   document.getElementById('modal-dialog').innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">${title}</h3><button onclick="hideModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;padding:0 4px;line-height:1" title="關閉">&times;</button></div>${body}`;
   overlay.style.display = 'flex';
 }
+function logout() { document.cookie = "fotan_auth=; Path=/; Max-Age=0"; location.reload(); }
 function hideModal() {
   document.getElementById('modal-overlay').style.display = 'none';
 }
