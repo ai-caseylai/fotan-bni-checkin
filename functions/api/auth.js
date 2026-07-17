@@ -46,7 +46,7 @@ export async function onRequest(context) {
             }
             await env.DB.prepare("DELETE FROM settings WHERE key='auth_fail_' || ?").bind(clientIp).run();
             await env.DB.prepare("DELETE FROM settings WHERE key='auth_lock_' || ?").bind(clientIp).run();
-            return setCookie(username + ':' + userRow.role, '登入成功', cors);
+            return setCookie(username + ':' + (username === 'admin' ? 'admin' : userRow.role), '登入成功', cors);
           }
         }
         return trackFail(env, clientIp, cors);
