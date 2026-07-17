@@ -10,6 +10,20 @@ function setSearchText(type, val) { searchTexts[type] = val; }
 let ciViewMode = 'card';
 let mgmtViewMode = 'card';
 let ciPollTimer = null;
+let currentUserRole = 'admin'; // default, updated after auth check
+
+// Role permissions: which pages each role can access
+const ROLE_PERMISSIONS = {
+  admin:   ['overview','checkin','meetings','members','guests','settings','qatraining','skill','wacerts','docs'],
+  manager: ['overview','checkin','meetings','members','guests','settings','qatraining','skill','wacerts','docs'],
+  staff:   ['overview','checkin','members','guests','skill','wacerts','docs'],
+  viewer:  ['overview','checkin','members','guests','wacerts','docs']
+};
+
+function canAccess(page) {
+  const allowed = ROLE_PERMISSIONS[currentUserRole] || ROLE_PERMISSIONS['viewer'];
+  return allowed.includes(page);
+}
 let ciLastHash = '';
 
 async function doLogin() {
@@ -51,6 +65,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('login-overlay').style.display = 'flex';
       return;
     }
+    currentUserRole = check.role || 'admin';
+    // Hide sidebar items based on role
+    document.querySelectorAll('.sb-link').forEach(link => {
+      if (!canAccess(link.dataset.page)) link.style.display = 'none';
+    });
   } catch (e) {
     document.getElementById('login-overlay').style.display = 'flex';
     return;
@@ -78,6 +97,10 @@ function closeSidebar() {
 }
 
 function switchPage(page) {
+  if (!canAccess(page)) {
+    toast('權限不足');
+    return;
+  }
   currentPage = page;
   document.querySelectorAll('.sb-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.getElementById('topbar-title').textContent = {
@@ -1294,6 +1317,7 @@ function showMeetingForm(editId) {
 function editMeeting(id) { showMeetingForm(id); }
 
 async function deleteMeeting(id) {
+  if (currentUserRole !== 'admin') { toast('權限不足：只有管理員可以刪除會議'); return; }
   if (!confirm('確定要刪除此會議及所有出席記錄嗎？')) return;
   await api(`/meetings?id=${id}`, { method: 'DELETE' });
   toast('已刪除');
@@ -1658,6 +1682,7 @@ async function showPersonForm(type, editId) {
 }
 
 async function deletePerson(type, id, name) {
+  if (currentUserRole !== 'admin') { toast('權限不足：只有管理員可以刪除'); return; }
   if (!confirm(`確定要刪除「${name}」嗎？`)) return;
   await api(`/${type}s?id=${id}`, { method: 'PUT', body: JSON.stringify({active: 0}) });
   toast('已刪除');
@@ -2201,6 +2226,7 @@ async function uploadQR(type) {
 }
 
 async function saveSettings() {
+  if (currentUserRole !== 'admin' && currentUserRole !== 'manager') { toast('權限不足：只有管理員可以修改系統設定'); return; }
   var data = {};
   window._settingsFields.forEach(function(f) {
     var el = document.getElementById('set-'+f.key);
