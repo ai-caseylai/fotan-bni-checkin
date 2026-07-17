@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="zh-HK"><head><meta charset="UTF-8">
+<style>
+  body{font-family:-apple-system,sans-serif;color:#0f172a;line-height:1.8;max-width:800px;margin:0 auto;padding:40px;font-size:13px}
+  h1{font-size:26px;border-bottom:3px solid #0d9488;padding-bottom:12px}
+  h2{font-size:18px;color:#0d9488;margin-top:28px;border-bottom:1px solid #e2e8f0;padding-bottom:6px}
+  h3{font-size:15px;margin-top:20px}
+  hr{margin:20px 0;border:none;border-top:1px solid #e2e8f0}
+  p{margin:6px 0}
+  img{max-width:100%;border-radius:8px;border:1px solid #e2e8f0}
+  code{background:#f1f5f9;padding:2px 5px;border-radius:4px;font-size:12px}
+  pre{background:#f1f5f9;padding:10px;border-radius:8px;font-size:12px;overflow-x:auto}
+  table{border-collapse:collapse;width:100%;margin:10px 0}
+  td,th{border:1px solid #e2e8f0;padding:6px 10px;font-size:12px;text-align:left}
+  th{background:#f8fafc;font-weight:600}
+  ul{padding-left:20px;line-height:1.8}
+</style></head><body><h1>火炭會聚會簽到系統 — 使用手冊</h1><h1>火炭會聚會簽到系統 — 使用手冊 v3.15</h1>
+
+<h2>系統概述</h2>
+
+<p>火炭會聚會簽到系統是一個專為商會聚會設計的簽到管理平台，支援手機簽到、多種付款方式、即時統計。</p>
+
+<strong>主頁</strong>：https://fotan.techforliving.net  
+<strong>登入</strong>：https://fotan.techforliving.net/login.html  
+<strong>後台</strong>：https://fotan.techforliving.net/admin
+
+<hr>
+
+<h2>一、主頁簽到流程</h2>
+
+<h3>1.1 未簽到名單</h3>
+<p>進入主頁後，底部 tab 預設顯示「未簽到」名單。所有人按 A-Z 排列，顯示姓名、付款狀態、枱號。</p>
+
+<p style="text-align:center"><img src="../screenshots/01-main-unchecked.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">主頁-未簽到</p>
+
+<h3>1.2 點擊簽到</h3>
+<p>點擊人名 → 若已付款則彈出確認框 → 按「✓ 確認」完成簽到。</p>
+
+<h3>1.3 付款頁面</h3>
+<p>若未付款，點擊後會顯示付款頁面，包含：</p>
+<ul><li><strong>PayMe</strong> — 直接跳轉付款</li></ul>
+<ul><li><strong>Alipay</strong> — 顯示 QR Code 供掃描</li></ul>
+<ul><li><strong>FPS 轉數快</strong> — 顯示 QR Code + 收款電話</li></ul>
+<ul><li><strong>上傳付款憑證</strong> — 選擇截圖上傳確認</li></ul>
+
+<p style="text-align:center"><img src="../screenshots/03-payment-modal.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">付款頁面</p>
+
+<h3>1.4 已完成簽到</h3>
+<p>付款確認後，顯示「多謝光臨」及枱號資訊。</p>
+
+<h3>1.5 已簽到名單</h3>
+<p>底部 tab 切換至「已簽到」，查看所有已完成簽到的人員。</p>
+
+<p style="text-align:center"><img src="../screenshots/02-main-checked.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">已簽到名單</p>
+
+<hr>
+
+<h2>二、個人資料卡</h2>
+
+<p>在「已簽到」tab 點擊任何人，彈出個人資料卡：</p>
+<ul><li>頭像、姓名、枱號</li></ul>
+<ul><li>💼 專業、🏅 角色（委員/會員）</li></ul>
+<ul><li>📝 會員簡介</li></ul>
+<ul><li>📱 電話（點擊可直接撥打）</li></ul>
+<ul><li>📧 電郵</li></ul>
+<ul><li>📇 <strong>加入通訊錄 (vCard)</strong> — 下載 .vcf 檔案，直接加入手機電話簿</li></ul>
+
+<p style="text-align:center"><img src="../screenshots/04-person-card.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">個人資料卡</p>
+
+<hr>
+
+<h2>三、底部 Tab Bar</h2>
+
+<table><tr><td>Tab</td><td>功能</td></tr></table>
+
+<table><tr><td>👥 未簽到</td><td>顯示尚未簽到的人員</td></tr></table>
+<table><tr><td>✅ 已簽到</td><td>已簽到名單，點擊查看個人資料卡 + vCard</td></tr></table>
+<table><tr><td>📋 流程</td><td>節目時間表 + 主席的話</td></tr></table>
+<table><tr><td>🏅 委員</td><td>委員介紹</td></tr></table>
+<table><tr><td>🎮 遊戲</td><td>遊戲資訊</td></tr></table>
+<table><tr><td>ℹ️ 關於</td><td>火炭會介紹 + 申請入會連結</td></tr></table>
+
+<hr>
+
+<h2>四、用戶登入/註冊</h2>
+
+<h3>4.1 登入</h3>
+<p>用戶可通過 <code>/login.html</code> 登入系統。</p>
+
+<p style="text-align:center"><img src="../screenshots/15-login.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">登入頁</p>
+
+<h3>4.2 註冊</h3>
+<p>新用戶可通過 <code>/register.html</code> 註冊帳戶，需等待管理員批核後方可使用。</p>
+
+<p style="text-align:center"><img src="../screenshots/16-register.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">註冊頁</p>
+
+<hr>
+
+<h2>五、付款方式</h2>
+
+<table><tr><td>方式</td><td>說明</td></tr></table>
+
+<table><tr><td>PayMe</td><td>點擊直接跳轉 PayMe 付款</td></tr></table>
+<table><tr><td>Alipay HK</td><td>QR Code 掃碼付款</td></tr></table>
+<table><tr><td>FPS 轉數快</td><td>QR Code + 收款電話，支援銀行 App 掃碼</td></tr></table>
+<table><tr><td>上傳憑證</td><td>截圖上傳由管理員確認</td></tr></table>
+
+<hr>
+
+<h2>六、簽到規則</h2>
+
+<p>1. <strong>未付款者</strong>：點擊後直接跳轉付款頁面，必須完成付款方可簽到</p>
+<p>2. <strong>已付款者</strong>：點擊後彈出確認框，確認後立即簽到</p>
+<p>3. <strong>免費嘉賓</strong>：直接簽到，無需付款</p>
+</body></html>

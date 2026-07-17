@@ -1,0 +1,130 @@
+<!DOCTYPE html><html lang="zh-HK"><head><meta charset="UTF-8">
+<style>
+  body{font-family:-apple-system,sans-serif;color:#0f172a;line-height:1.8;max-width:800px;margin:0 auto;padding:40px;font-size:13px}
+  h1{font-size:26px;border-bottom:3px solid #0d9488;padding-bottom:12px}
+  h2{font-size:18px;color:#0d9488;margin-top:28px;border-bottom:1px solid #e2e8f0;padding-bottom:6px}
+  h3{font-size:15px;margin-top:20px}
+  hr{margin:20px 0;border:none;border-top:1px solid #e2e8f0}
+  p{margin:6px 0}
+  img{max-width:100%;border-radius:8px;border:1px solid #e2e8f0}
+  code{background:#f1f5f9;padding:2px 5px;border-radius:4px;font-size:12px}
+  pre{background:#f1f5f9;padding:10px;border-radius:8px;font-size:12px;overflow-x:auto}
+  table{border-collapse:collapse;width:100%;margin:10px 0}
+  td,th{border:1px solid #e2e8f0;padding:6px 10px;font-size:12px;text-align:left}
+  th{background:#f8fafc;font-weight:600}
+  ul{padding-left:20px;line-height:1.8}
+</style></head><body><h1>火炭會聚會簽到系統 — 後台管理手冊</h1><h1>後台管理手冊 v3.7</h1>
+
+<h2>登入</h2>
+
+<p>1. 開啟 <strong>https://fotan.techforliving.net/admin</strong></p>
+<p>2. 輸入管理密碼</p>
+
+<p style="text-align:center"><img src="../screenshots/admin-login.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">登入頁</p>
+
+<hr>
+
+<h2>總覽</h2>
+
+<p style="text-align:center"><img src="../screenshots/admin-overview.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">總覽</p>
+
+<p>只顯示<strong>當前會議</strong>關鍵數據：</p>
+<ul><li>📅 會議日期 + 類型</li></ul>
+<ul><li>👥 出席人數（總數、會員、來賓、已簽到）</li></ul>
+<ul><li>💰 收款（收費人數、免費人數、未收人數、收費標準、已收收入）</li></ul>
+<ul><li>📊 付款分佈甜甜圈圖（已收/免費/未收）</li></ul>
+<ul><li>📋 收入摘要（會員/來賓/收費/免費/未收明細）</li></ul>
+
+<p>> <strong>v3.7</strong>：已收人數分拆為「💰 收費」和「🆓 免費」兩張獨立卡片，營收只計算已付費者（不含免費嘉賓）。</p>
+
+<hr>
+
+<h2>簽到操作</h2>
+
+<p style="text-align:center"><img src="../screenshots/admin-checkin.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">簽到操作</p>
+
+<ul><li><strong>點擊人物卡片</strong> → 自動記錄當前時間 + 彈出操作模態頁</li></ul>
+<ul><li><strong>點擊付款 badge</strong> → 付款模態頁（💵現金 / 📤憑證付費 / 🆓免費）</li></ul>
+<ul><li><strong>✕ 按鈕</strong> → 標記缺席</li></ul>
+
+<p style="text-align:center"><img src="../screenshots/admin-payment-modal.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">付款模態</p>
+
+<hr>
+
+<h2>會議管理</h2>
+
+<p style="text-align:center"><img src="../screenshots/admin-meetings.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">會議管理</p>
+
+<ul><li>列表/日曆雙模式</li></ul>
+<ul><li>5 個收費欄位：委員價、會員價、來賓價、早鳥價、臨場價</li></ul>
+<ul><li>展開出席名單（A-Z），支援付款篩選</li></ul>
+<ul><li>新增會議可複製上次會員</li></ul>
+
+<hr>
+
+<h2>會員管理</h2>
+
+<p style="text-align:center"><img src="../screenshots/admin-members.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">會員管理</p>
+
+<ul><li>26 個活躍會員，卡片/表格雙模式</li></ul>
+<ul><li>編輯：名稱、電話、電郵、專業、角色、會費日、簡介</li></ul>
+<ul><li>付款憑證上傳（支援多張）</li></ul>
+<ul><li><strong>🆕 卡片直接顯示憑證縮圖</strong>（最多 3 張，超出顯示 +N）</li></ul>
+<ul><li>出席歷史</li></ul>
+
+<hr>
+
+<h2>來賓管理</h2>
+
+<p style="text-align:center"><img src="../screenshots/admin-guests.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">來賓管理</p>
+
+<ul><li>表格模式含付款狀態欄位（💰已付 / 🆓免費 / ❌💰未付）</li></ul>
+<ul><li>卡片模式顯示出席記錄</li></ul>
+
+<hr>
+
+<h2>系統設定</h2>
+
+<p style="text-align:center"><img src="../screenshots/admin-settings.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">系統設定</p>
+
+<table><tr><td>區塊</td><td>內容</td></tr></table>
+
+<table><tr><td>⚙️ 基本設定</td><td>頁面標題、載入文字</td></tr></table>
+<table><tr><td>✏️ 簽到流程</td><td>簽到標題、跳過按鈕開關</td></tr></table>
+<table><tr><td>🍽️ 午餐與節目</td><td>午餐費、枱號、時間表、主席話</td></tr></table>
+<table><tr><td>💳 付款連結</td><td>PayMe/Alipay/FPS 連結、QR 碼</td></tr></table>
+<table><tr><td>🔐 密碼</td><td>修改管理密碼</td></tr></table>
+<table><tr><td>💿 備份</td><td>一鍵下載 JSON</td></tr></table>
+
+<hr>
+
+<h2>火炭會 Skill</h2>
+
+<p style="text-align:center"><img src="../screenshots/admin-skill.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">Skill 頁面</p>
+
+<ul><li>📥 下載 Skill 檔 / API 手冊 / 使用手冊</li></ul>
+<ul><li>🔑 Token 管理（90 天有效）</li></ul>
+<ul><li>Skill API 17 種操作，全部有 curl 範例</li></ul>
+
+<hr>
+
+<h2>多層收費</h2>
+
+<table><tr><td>Tier</td><td>判定</td><td>欄位</td></tr></table>
+
+<table><tr><td>委員</td><td>role != '會員'</td><td>committee_fee（$220）</td></tr></table>
+<table><tr><td>會員</td><td>role = '會員'</td><td>member_fee</td></tr></table>
+<table><tr><td>來賓</td><td>person_type='guest'</td><td>guest_fee</td></tr></table>
+<table><tr><td>早鳥</td><td>price_tier='early_bird'</td><td>early_bird_fee</td></tr></table>
+<table><tr><td>臨場</td><td>price_tier='walk_in'</td><td>walk_in_fee</td></tr></table>
+
+<hr>
+
+<h2>Chatbot 面板</h2>
+
+<p style="text-align:center"><img src="../screenshots/admin-chatbot.png" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0;margin:12px 0"></p><p style="text-align:center;font-size:11px;color:#64748b">Chatbot</p>
+
+<ul><li>💬 港式廣東話 AI（21 tools）</li></ul>
+<ul><li>📎 Excel 自動導入 / 圖片 AI 分析</li></ul>
+<ul><li>📱 TG 對話記錄</li></ul>
+</body></html>
