@@ -14,8 +14,8 @@ let currentUserRole = 'admin'; // default, updated after auth check
 
 // Role permissions: which pages each role can access
 const ROLE_PERMISSIONS = {
-  admin:   ['overview','checkin','meetings','members','guests','settings','qatraining','skill','wacerts','docs','users'],
-  manager: ['overview','checkin','meetings','members','guests','settings','qatraining','skill','wacerts','docs','users'],
+  admin:   ['overview','checkin','meetings','members','guests','settings','qatraining','skill','wacerts','docs','users','seating'],
+  manager: ['overview','checkin','meetings','members','guests','settings','qatraining','skill','wacerts','docs','users','seating'],
   staff:   ['overview','checkin','members','guests','skill','wacerts','docs'],
   viewer:  ['overview','checkin','members','guests','wacerts','docs']
 };
