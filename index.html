@@ -500,13 +500,7 @@ function uploadGuestReceipt(attId){
   reader.readAsDataURL(file);
 }
 
-document.addEventListener('DOMContentLoaded',async function(){
-	  try{
-	    var check=await fetch('/api/auth?action=check').then(function(r){return r.json()});
-	    if(!check.ok){window.location.href='/login';return}
-	    init();
-	  }catch(e){window.location.href='/login'}
-	});
+document.addEventListener('DOMContentLoaded',function(){init();});
 </script>
 </body>
 </html>
